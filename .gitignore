@@ -1,0 +1,59 @@
+# GROMACS output files (large — do not commit)
+*.gro
+*.tpr
+*.xtc
+*.trr
+*.edr
+*.cpt
+*.log
+*.xvg
+*.xdr
+*.dhdl
+*.energy
+*.pdb
+!structures/NA53_initial.pdb
+!templates/*.pdb
+
+# Topology files (generated — do not commit)
+topol.top
+topol.tpr
+posre*.itp
+ions.itp
+*processed*
+*boxed*
+*solvated*
+*ionized*
+em.*
+nvt.*
+npt*.*
+
+# Conda environment
+.conda/
+*.tar.bz2
+*.conda
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# Logs (regeneratable)
+logs/*.log
+logs/*.out
+logs/*.err
+
+# Temp files
+*.tmp
+*.bak
+prod_mdp_temp.mdp

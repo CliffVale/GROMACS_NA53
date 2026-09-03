@@ -1,0 +1,25 @@
+# VERIFIED Taiwania 3 (2026-09-03): NO cuda/cmake/openmpi/fftw modules, GPU
+# partitions restricted (ngs*) or down (gpu-amd). Therefore the engine is the
+# conda-forge CPU build of GROMACS — prebuilt (AVX2 + thread-MPI), zero compile
+# risk, ~40-70 ns/day on a 56-core ct56 node. Do NOT mix a source-compiled gmx
+# into this env (two binaries would shadow each other).
+name: na53_aptamer
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - gromacs=2024.4
+  - ambertools=23
+  - viennarna
+  - numpy
+  - scipy
+  - matplotlib
+  - seaborn
+  - pandas
+  - biopython
+  - mdanalysis
+  - natsort
+  - tqdm
+  - pip:
+    - seqfold

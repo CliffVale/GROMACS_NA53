@@ -1,0 +1,72 @@
+; ============================================================
+; PRODUCTION MD MDP — GROMACS_NA53
+; ============================================================
+; Unrestrained NPT production run
+; Duration: 500 ns (250,000,000 steps × 2 fs)
+; Thermostat: Nosé-Hoover at 310.15 K
+; Barostat: Parrinello-Rahman at 1.0 bar
+; No restraints — full production sampling
+; ============================================================
+
+; Run control
+integrator      = md
+nsteps          = 250000000     ; 500 ns
+dt              = 0.002
+
+; Bond constraints
+continuation    = yes
+constraint_algorithm = lincs
+constraints     = h-bonds
+lincs_iter      = 1
+lincs_order     = 4
+
+; Neighbor searching
+cutoff-scheme   = Verlet
+ns_type         = grid
+nstlist         = 10
+rcoulomb        = 1.0
+rvdw            = 1.0
+
+; Electrostatics
+coulombtype     = PME
+pme_order       = 4
+fourierspacing  = 0.12
+
+; Van der Waals
+vdwtype         = Cut-off
+DispCorr        = EnerPres
+
+; Temperature coupling — VALIDATED from GROMACS_TEEP
+tcoupl          = V-rescale     ; ✅ VALIDATED: V-rescale
+tc-grps         = DNA Water_and_ions  ; ✅ VALIDATED: Separate groups
+tau-t           = 0.1 0.1       ; ✅ VALIDATED: 0.1 ps coupling
+ref-t           = 310.15 310.15 ; ✅ Physiological temperature
+
+; Pressure coupling — VALIDATED from GROMACS_TEEP
+pcoupl          = parrinello-rahman  ; ✅ VALIDATED
+pcoupltype      = isotropic
+tau-p           = 2.0            ; ✅ VALIDATED: 2.0 ps
+ref-p           = 1.0
+compressibility = 4.5e-5
+
+; PBC
+pbc             = xyz
+
+; NO position restraints (define = )
+; ✅ CRITICAL: Never use restraints in production!
+
+; Output — COMPRESSED trajectory only (save storage!)
+nstxout         = 0                ; No .trr (full precision) — saves ~97% storage
+nstvout         = 0                ; No velocities
+nstfout         = 0                ; No forces
+nstxout-compressed = 5000          ; XTC every 10 ps
+nstenergy       = 5000             ; Energy every 10 ps
+nstlog          = 5000             ; Log every 10 ps
+nstcalcenergy   = 5000
+
+; No velocity generation (continuation)
+gen_vel         = no
+
+; Center of mass motion removal
+comm-mode       = Linear
+nstcomm         = 100

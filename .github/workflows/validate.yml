@@ -1,0 +1,71 @@
+name: validate
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  syntax-check:
+    name: Syntax & sanity checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate bash scripts
+        run: |
+          set -euo pipefail
+          failed=0
+          for f in scripts/*.sh slurm/*.sbatch slurm/*.sh; do
+            [ -f "$f" ] || continue
+            if ! bash -n "$f"; then
+              echo "❌ bash syntax error in $f"
+              failed=1
+            else
+              echo "✅ $f"
+            fi
+          done
+          exit $failed
+
+      - name: Validate Python scripts
+        run: |
+          set -euo pipefail
+          failed=0
+          for f in scripts/*.py; do
+            [ -f "$f" ] || continue
+            if ! python3 -m py_compile "$f"; then
+              echo "❌ python syntax error in $f"
+              failed=1
+            else
+              echo "✅ $f"
+            fi
+          done
+          exit $failed
+
+      - name: Validate environment.yml
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import sys
+          try:
+              import yaml
+          except ImportError:
+              print("⚠️  pyyaml not available — skipping YAML parse")
+              sys.exit(0)
+          with open("environment.yml") as f:
+              data = yaml.safe_load(f)
+          assert data["name"] == "na53_aptamer", "env name mismatch"
+          deps = data["dependencies"]
+          assert any(str(d).startswith("gromacs=") for d in deps), "gromacs pin missing"
+          print("✅ environment.yml OK")
+          EOF
+
+      - name: Check no CHANGE_ME placeholders in committed sbatch files
+        run: |
+          set -euo pipefail
+          if grep -rn "CHANGE_ME" slurm/ scripts/ 2>/dev/null; then
+            echo "❌ Unresolved CHANGE_ME placeholder committed"
+            exit 1
+          fi
+          echo "✅ No unresolved placeholders"

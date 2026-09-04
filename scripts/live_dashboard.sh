@@ -150,16 +150,34 @@ parse_log() { # $1=stage → sets total_steps total_ps cur_step cur_ps temp
                 END { if (st != "") print st, t }
             ' "$src")"
         fi
-        # temp/pres — header-aware: gmx layouts differ (Step Time Temp Pres
-        # vs Step Time Lambda Temp Pres …). Reads the Temp/Pres column
-        # positions from the table header; falls back to cols 4/5.
+        # temp/pres — gmx 2024 .log reports these as LABELED scalars inside
+        # the energy block (scientific notation), not Step/Time columns:
+        #   … Conserved En.    Temperature      ← label row, T is LAST label
+        #   -3.33e+06          3.09567e+02      ← value row, T is LAST value
+        #   Pres. DC (bar) Pressure (bar) …     ← P is the 2nd label/value
+        # Order-anchored on the raw row text (robust to spacing), with a
+        # cols-4/5 fallback for other gmx versions.
         if [ -z "$temp" ]; then
             read -r temp pres <<< "$(awk '
-                /^ *Step +Time/ { want=1; ti=0; pi=0; for (i=1;i<=NF;i++) { if ($i=="Temp") ti=i; if ($i=="Pres") pi=i } next }
-                want && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ {
-                    if (ti && pi && $ti ~ /^-?[0-9.]+$/ && $pi ~ /^-?[0-9.]+$/) { tp=$ti; pr=$pi }
-                    else if (NF >= 5 && $4 ~ /^-?[0-9.]+$/ && $5 ~ /^-?[0-9.]+$/) { tp=$4; pr=$5 }
+                /^ *Step +Time/ { want=1; lbl=""; next }
+                want && /Energies \(kJ\/mol\)/ { next }
+                want && $1 ~ /[A-Za-z]/ && $1 !~ /^[-+0-9]/ {
+                    lbl=$0; last=$NF; next
                 }
+                want && $1 ~ /^[-+0-9]/ {
+                    if (last=="Temperature") tp=$NF
+                    if (lbl ~ /Pressure \(bar\)/) pr=$2
+                    last=""
+                }
+                END { if (tp != "") printf "%.2f %.4f", tp+0, pr+0 }
+            ' "$src")"
+        fi
+        # fallback: tabular layout (older gmx) — Temp/Pres as cols 4/5
+        if [ -z "$temp" ]; then
+            read -r temp pres <<< "$(awk '
+                /^ *Step +Time/ { want=1; next }
+                want && NF >= 5 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ \
+                     && $4 ~ /^-?[0-9.]+$/ && $5 ~ /^-?[0-9.]+$/ { tp=$4; pr=$5 }
                 END { if (tp != "") print tp, pr }
             ' "$src")"
         fi

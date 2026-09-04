@@ -153,7 +153,7 @@ def md_tail(n=8):
 
 def snapshot():
     """everything the UI needs, as plain data"""
-    stage, path = active_log()
+    stage, path = active_log() or (None, None)   # None = between MD stages
     d = parse_log(path) if path else {}
     return dict(stage=stage, log=path, jobs=our_jobs(),
                 art=artifact_snapshot(), trail=run_status_tail(),

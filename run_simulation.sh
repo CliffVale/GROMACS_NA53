@@ -366,8 +366,12 @@ cmd_status() {
     done
     load_profile "$flag_name"
     echo "Profile: $PROFILE_NAME_CUR"
+    # Remote only from a NON-cluster machine: when squeue exists we ARE on the
+    # cluster (e.g. T3 login node lgn301), and SSH-ing back to twnia3 from
+    # itself would prompt for a second OTP and hang. Run local instead.
     if [ "$force_local" = "0" ] && remote_dest >/dev/null 2>&1 \
-       && [ "$(hostname)" != "${SSH_HOST}" ] && [ "${SSH_HOST}" != "localhost" ]; then
+       && [ "$(hostname)" != "${SSH_HOST}" ] && [ "${SSH_HOST}" != "localhost" ] \
+       && ! command -v squeue >/dev/null 2>&1; then
         echo "Machine: remote (${SSH_HOST}) — fetching snapshot (2FA OTP may prompt)…"
         remote_snapshot "$PROFILE_NAME_CUR"
     else
@@ -390,7 +394,10 @@ cmd_monitor() {
         case "$1" in --profile) flag_name="$2"; shift 2;; --once) once=1; shift;; *) shift;; esac
     done
     load_profile "$flag_name"
-    if [ "${SSH_HOST:-}" != "" ] && [ "$(hostname)" != "$SSH_HOST" ]; then
+    # Same guard as cmd_status: on the cluster itself (squeue present) run
+    # locally — SSH-ing back to $SSH_HOST from a login node would 2FA-hang.
+    if [ "${SSH_HOST:-}" != "" ] && [ "$(hostname)" != "$SSH_HOST" ] \
+       && ! command -v squeue >/dev/null 2>&1; then
         echo "Monitoring remote $SSH_HOST — Ctrl-C to stop."
         echo "NOTE: Taiwania 3 requires 2FA — you will be asked for an OTP."
         local dest; dest=$(remote_dest); local rcd; rcd=$(remote_cd)

@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-09-04 |
-| **Current phase** | Phase 5 — real 75-nt NA53 structure: AF3 run by user (in progress); run-readiness layer + T3 runbook ready (CLUSTER_RUNBOOK) |
+| **Current phase** | ✅ **Phase 5 COMPLETE** — real 75-nt AF3 structure staged & blessed (`structures/NA53_initial.pdb`, provenance in `structures/raw_af3/`). **Next: Phase 6 = T3 cluster run** (env create → doctor → smoke → 100 ns prod) |
 
 > **Purpose:** the single source of truth for *what has been done, what is being
 > worked on, and what comes next*. Any AI resuming this project must read this
@@ -21,7 +21,7 @@
   NPT → 1 ns prod (~5 min) → all 8 analyses → 8 figures. Zero warnings.
 - 🔵 Phase 4 (Taiwania 3 setup) scripted + mostly verified live; env install
   still needs one run on the cluster.
-- ⬜ **Phase 5 (in progress)**: real 75-nt NA53 structure — user generates via AlphaFold 3, drops it in `structures/`, validator (`scripts/validate_na53_pdb.py`) gates it, then `docs/CLUSTER_RUNBOOK.md` drives the T3 run.
+- ✅ **Phase 5 COMPLETE (2026-09-04)**: real 75-nt NA53 structure staged from **AlphaFold 3 model_0** (job 2026-09-04_19:14) via `validate_na53_pdb.py --stage` (new mmCIF support + 5'-triphosphate→monophosphate normalization). Provenance (raw model CIF + confidences + job request + pTM caveat) in `structures/raw_af3/PROVENANCE.md`. pTM 0.19 is expected-low for unbound ssDNA — not a defect signal (has_clash 0, disordered 0).
 - 🟦 **2026-09-04 correction: NA53 is 75 nt, not 55 nt** — the pasted sequence and the Hong-2019 primary-source transcription (lit-review C2) both give 75 nt (20 fixed + 35 random + 20 fixed); the '55-nt' figure was a miscount that had propagated through README/PRD/GLOSSARY/BEGINNER_GUIDE/HPC docs. All corrected; canonical seq in `structures/NA53.fasta`; `validate_na53_pdb.py` enforces it (rejects the 55-nt impostor).
 
 ---
@@ -56,6 +56,8 @@
 | 2026-09-04 | **Beginner-friendly documentation pass** — new `docs/BEGINNER_GUIDE.md` (zero-knowledge walkthrough: science primer, repo map, stage-by-stage pipeline, 3 ways to run, results sanity checklist, troubleshooting) and `docs/GLOSSARY.md` (plain-language dictionary of every term). README rewritten beginner-first (plain intro, reading paths, annotated structure, one-glance pipeline) and its parameter table **corrected to the running truth**: FF row now states `amber99sb-ildn` + TIP3P (not AMBER99bsc1) with parmbsc1 flagged under evaluation; cutoffs **1.0 → 0.8 nm**; thermostat V-rescale (not Nosé–Hoover) — matching the ✅ configs and docs/INCIDENT_ANALYSIS class P | docs/BEGINNER_GUIDE.md, docs/GLOSSARY.md, README.md |
 
 | 2026-09-04 | **Cluster-run readiness + 75-nt correction** — NA53 proven **75 nt** (pasted sequence + lit-review C2 both 75; '55-nt' was a propagated miscount) → corrected README/PRD/GLOSSARY/BEGINNER_GUIDE/HPC_GPU_OPTIONS/LESSONS_LEARNED/TRANSCRIPTS/bibliography/profiles/00 script; added `structures/NA53.fasta` (canonical, provenance-header) + `scripts/validate_na53_pdb.py` (AF3/3D-model gate: length/identity/completeness incl. sugar atoms, altLoc, chain; in-memory `--selftest`; rejects the 55-nt impostor); **fixed launcher bug: `submit --ns N` was ignored** (generate_jobs never templated it — smoke would have silently run 100 ns) → ns threaded into generated 03 job (dry-run verified: `--ns 1` → `NS_LENGTH="${1:-1}"`); wrote `docs/CLUSTER_RUNBOOK.md` (75-nt-aware T3 walkthrough: validate→setup→doctor→1 ns smoke→measure ns/day→archive→100 ns prod→RESTART→fetch) | structures/NA53.fasta, scripts/validate_na53_pdb.py, docs/CLUSTER_RUNBOOK.md, run_simulation.sh, docs sweep |
+| 2026-09-04 (2) | **APTAMD adoption round** — added `validate_na53_pdb.py --stage` (APTAMD-style auto edition: model-1 keep, drop water/protein/H/altLoc, merge chains, renumber 1..75, re-bless, atomic stage; fails leave no file) + `scripts/dssr_inf.sh` (optional DSSR/INF vs seqfold 2D; auto-skip rc0 when x3dna-dssr absent — DSSR is Columbia-licensed, NOT conda-installable). Caught+fixed 2 real stage bugs via selftest (MODEL-serial column overlap dropped atoms past serial 9; per-atom residue counter made every atom its own residue). Negatives green on real 1BNA (24 nt, 2 chains, 80 waters) + trial stand-in (12 nt). Updated runbook §0 to one-liner, APTAMD_DEEP_ANALYSIS.md banner+addendum, architecture.md, Q4 answered | `scripts/validate_na53_pdb.py`, `scripts/dssr_inf.sh`, runbook §0 |
+| 2026-09-04 (3) | **Phase 5 COMPLETE — real AF3 structure staged** — user's AlphaFold 3 zip (job 2026-09-04_19:14, 5 models) found at repo root; model_0 (best pTM 0.19) staged via the new `validate_na53_pdb.py --stage` mmCIF path → `structures/NA53_initial.pdb` BLESSED (75 nt, seq-identical, 1544 atoms; OP3 gamma-P dropped → amber DA5 monophosphate terminus). Provenance (model CIF + confidences + full_data + job_request + pTM caveat) committed under `structures/raw_af3/`. Integrity all-PASS. **Cluster run is now unblocked** — next: T3 env → doctor → smoke | `structures/NA53_initial.pdb`, `structures/raw_af3/` |
 ## 3. Files — Current Ownership & Status
 | 2026-09-04 | **T3 etiquette research** (user request: common Taiwania-3 usage violations to avoid) — consolidated `docs/TAIWANIA3_ETIQUETTE.md`: login-banner enforcement `[P]` (login-node misuse; squeue <30 s hammering = attack; 1-week suspension per repeat), official manual `[W]` (crypto/weapons/cyber → suspension; 2FA no-bypass), official FAQ `[W]` (no `--mem` = whole-node memory grab; core scatter; PartitionTimeLimit; requeue/PREEMPTED; /tmp cleanup). Confirmed our profile already sets `--mem`/`--nodes`/`--cpus-per-task` correctly. Repo made **PUBLIC** this session (was private — clone on T3 needed anonymous access) | docs/TAIWANIA3_ETIQUETTE.md, docs/REFERENCES.md §5 |
 
@@ -216,7 +218,7 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | Q1 | Will AptaFold run on Taiwania 3 CPU-only, or do we use w3DNA web? | agent | Phase 5 |
 | Q2 | Storage quota on /work for 100+ ns trajectory (est. few GB .xtc)? | user/agent | Phase 8 |
 | Q3 | Is 100 ns enough for convergence, or extend to 300–500 ns? | agent (Phase 9 data) | Phase 8 |
-| Q4 | INF/DSSR analysis worth installing for publication? | user | Phase 9 |
+| Q4 | ~~INF/DSSR analysis worth installing for publication?~~ **ANSWERED 2026-09-04:** `scripts/dssr_inf.sh` exists (optional; DSSR is Columbia-licensed so it stays OUT of environment.yml — install later only if the paper needs INF) | user (optional) | Phase 9 |
 | Q5 | Cluster rep structures → docking (AutoDock/HADDOCK)? | user | Phase 10 |
 | Q6 | Will NCHC grant/rent GPU to mst115368 on T3 (gpu-amd A100)? | user | Phase 3/4 |
 | Q7 | Switch DNA FF amber99sb-ildn → parmbsc1/OL15 (bibliography R2: Dans 2017)? Needs a pdb2gmx validation run + re-doctor before real prod | agent | Phase 6 |

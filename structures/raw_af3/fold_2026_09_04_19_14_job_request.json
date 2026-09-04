@@ -1,0 +1,17 @@
+[{
+ "name": "2026-09-04_19:14",
+ "modelSeeds": [
+  "1125232007"
+ ],
+ "sequences": [
+  {
+   "dnaSequence": {
+    "sequence": "AGCAGCACAGAGGTCAGATGGCGCTGGATAGCAAGATCACGTTATCATCGTAAACCCTATGCGTGCTACCGTGAA",
+    "count": 1
+   }
+  }
+ ],
+ "dialect": "alphafoldserver",
+ "version": 3
+}
+]

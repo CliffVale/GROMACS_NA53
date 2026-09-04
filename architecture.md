@@ -88,6 +88,8 @@ GROMACS_NA53/
 │   ├── 04_analysis.sh
 │   ├── 05_visualization.py
 │   ├── run_pipeline.sh         # master runner (--stage all|prep|equil|prod|analysis)
+│   ├── validate_na53_pdb.py    # Phase-5 gate: [--stage] clean+bless AF3/model PDB → NA53_initial.pdb
+│   ├── dssr_inf.sh             # OPTIONAL DSSR/INF (auto-skip rc0 when x3dna-dssr absent)
 │   ├── install_dependencies.sh
 │   └── install_gromacs_gpu.sh  # OPTIONAL: local GPU machines only
 │

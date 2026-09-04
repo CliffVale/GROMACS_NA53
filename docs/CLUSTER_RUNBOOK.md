@@ -14,18 +14,25 @@ verified-facts source and `profiles/taiwania3_cpu.env` for the values.
 
 ## 0. Pre-flight (your workstation — one command)
 
-Every candidate 3D model must pass the gate **before** it is committed:
+Every candidate 3D model must pass the gate **before** it is committed. One
+command does the whole job (APTAMD-style automated edition, 2026-09-04):
+**clean → bless → stage** — it keeps model 1, drops water/protein/ions/ligands
+and hydrogens, resolves altLoc duplicates, merges stray chains, renumbers
+residues 1..75, re-validates the CLEANED result, and only then writes
+`structures/NA53_initial.pdb`. A rejected model leaves **no file behind**.
+AlphaFold 3 emits **mmCIF (.cif)** — `--stage` reads .cif and .pdb natively
+and normalizes AF3's nonstandard 5'-triphosphate to the amber `DA5`
+monophosphate terminus (drops the gamma OP3 atom, reported in the output).
 
 ```bash
 cd GROMACS_NA53
-python3 scripts/validate_na53_pdb.py /path/to/your/AF3_model.pdb   # expect ✅ BLESSED
-cp /path/to/your/AF3_model.pdb structures/NA53_initial.pdb
+python3 scripts/validate_na53_pdb.py --stage /path/to/your/AF3_model.pdb   # expect ✅ BLESSED + STAGED
 git add structures/NA53_initial.pdb structures/NA53.fasta
 git commit -m "Phase 5: real NA53 75-nt structure (AF3) — validated" && git push
 ```
 
 Rejections tell you exactly what is wrong (length, position mismatch, missing
-atoms). Fix in the modeling tool and re-validate; **never commit an unvalidated PDB**.
+atoms). Fix in the modeling tool and re-stage; **never commit an unvalidated PDB**.
 
 ## 1. First time on Taiwania 3 — environment (once)
 

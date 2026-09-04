@@ -1,3 +1,41 @@
+> ⚠️ **VALIDATION BANNER (2026-09-04) — READ BEFORE TRUSTING RECOMMENDATIONS**
+> This document was written 2026-09-02, BEFORE three project decisions changed
+> what is actionable. Where it conflicts with the text below, the ADDENDUM wins:
+> 1. **Structure source = AlphaFold 3** (user decision + bibliography R1), NOT
+>    RNAComposer→DNA-conversion. RNAComposer is RNA-only; §4.1-① is superseded.
+> 2. **GROMACS has NO native GaMD/aMD** — §4.1-②'s "GROMACS's integrated
+>    adaptively tempered MD" does not exist. GaMD is an AMBER feature; AMBER is
+>    not installed on Taiwania 3. Two-stage GaMD→cMD stays OUT of scope (de-novo
+>    folding is out of scope by design — see research report R4).
+> 3. **`x3dna-dssr` is NOT on conda-forge** — DSSR 2.0 is licensed by Columbia
+>    University (academic free after registration). §9's install table is wrong
+>    and adding DSSR to environment.yml would break `conda env create`.
+> Root cause class: early-analysis recommendations outpaced verified platform
+> facts. Corrected by docs/INCIDENT_ANALYSIS.md class-P practice.
+
+---
+
+## ADDENDUM 2026-09-04 — What was actually adopted (and what was not)
+
+Implementation of this analysis produced **`scripts/validate_na53_pdb.py --stage`**
+(the APTAMD `do_aptamer_edition` analog, adapted to GROMACS + AF3 input) and
+**`scripts/dssr_inf.sh`** (optional DSSR/INF, auto-detected). Mapping:
+
+| APTAMD capability | Adoption for GROMACS_NA53 | Status |
+|---|---|---|
+| `do_aptamer_edition` auto clean+monitor (Stage 1) | `validate_na53_pdb.py --stage RAW.pdb` → clean (model 1, altLoc, waters, chains, renumber) → bless (75-nt identity + completeness) → atomic stage to `structures/NA53_initial.pdb` | ✅ DONE, selftest + 1BNA/trial negatives green |
+| 2D structure before 3D (Session 2) | `00_predict_structure.sh` seqfold (env-shipped) writes `NA53_secondary.dbn` + `NA53_pairs.txt`; AF3 model replaces the old "B-form helix fallback" (removed) | ✅ already in pipeline |
+| INF metric via DSSR (Stage 3) | `dssr_inf.sh` — INF = TP/(TP+FP+FN) of seqfold 2D pairs vs DSSR-detected pairs. **Optional**: auto-skips with rc 0 when `x3dna-dssr` is absent (licensing, see banner #3); NOT in the sbatch chain | ✅ DONE (optional) |
+| GaMD enhanced sampling (Stage 2) | NOT adopted — AMBER-only; GROMACS CPU build on ct56; de-novo folding out of scope. If a folding study is ever needed: AMBER+APTAMD on a GPU grant, or GROMACS replica-exchange | ⏸ tracked Q6/Q7 |
+| Two-stage GaMD→cMD (Stage 4) | NOT adopted for Phase 8 (AF3-start stability run is the scope). Revisit only if the AF3 model proves unstable | ⏸ future |
+| Ensemble docking / MM-PBSA (Stage 5) | NOT adopted — docking is Phase 10 (separate deliverable, per WBS) | ⏸ future |
+| CENCALC conformational entropy | NOT adopted — needs AMBER toolchain | ⏸ future |
+
+**Files changed by this addendum (commit to follow):** `scripts/validate_na53_pdb.py`
+(added `--stage`), `scripts/dssr_inf.sh` (new), `docs/CLUSTER_RUNBOOK.md` §0,
+`docs/APTAMD_DEEP_ANALYSIS.md` (this banner + addendum), records per repo SOP.
+
+---
 # 🔬 DEEP ANALYSIS: APTAMD & APTAMD_TUTORIALS
 ## Relevance to NA53 DNA Aptamer Simulation Pipeline
 

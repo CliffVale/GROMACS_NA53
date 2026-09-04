@@ -1,19 +1,24 @@
 #!/bin/bash
 # ============================================================
-# live_dashboard.sh — NA53 real-time simulation dashboard
+# live_dashboard.sh — NA53 real-time simulation dashboard (THE monitor)
 # GROMACS_NA53
 # ============================================================
-# Polls every N seconds and re-renders a simple, line-based screen
-# (the Textual TUI in dashboard_textual.py is the fancy option — this
-# is the zero-dependency fallback that works on any terminal):
+# Polls every N seconds and re-renders a simple, line-based screen.
+# Zero dependencies: pure bash + squeue + log reads — nothing to pip
+# install, safe on a login node. `./run_simulation.sh monitor` runs
+# this and only this (no TUI layer).
 #
 #   JOBS        every na53_* SLURM job (state, elapsed/limit, node/reason)
 #   STAGE       active MD stage + progress bar + step/sim time
 #   PHYSICS     live Temp / Pres from the gmx .log energy table
 #   SPEED+ETA   measured ns/day, stage ETA, prod-target ETA
 #   PIPELINE    01 prep / 02 equil / 03 prod / 04 analysis checklist
+#   LOG         tail of the newest logs/mdrun_*.log (raw mdrun output)
 #   TRAIL       last launcher events (logs/run_status.txt)
-#   STATUS      ✅ / ⏳ / ⚠️ / ❌ verdict + log freshness
+#   STATUS      ✅ / ⏳ / ⚠️ / ❌ verdict — incl. a STALE-STAGE check that
+#               flags an unfinished stage log with no job running (a
+#               job that died/killed mid-stage shows up here, not as
+#               "idle")
 #
 # Data is read live from squeue, the gmx .log sidecars
 # (scripts/{em,nvt,npt1,npt2,prod}.log) and pipeline artifacts — no gmx
@@ -98,37 +103,67 @@ active_log() { # newest scripts/<stage>.log NOT finished; echoes "stage path"
     [ -n "$best" ] && echo "$best scripts/$best.log"
 }
 
-parse_log() { # $1=stage $2=log → sets total_steps total_ps cur_step cur_ps
-              #                    temp pres fin_eta fin_step log_age
-    local s="$1" log="$2" line
+parse_log() { # $1=stage → sets total_steps total_ps cur_step cur_ps temp
+              # pres fin_eta fin_step log_age. Merges BOTH the gmx sidecar
+              # scripts/<stage>.log and the redirected mdrun stdout
+              # logs/mdrun_<stage>.log — mdrun prints its "step N, will
+              # finish" ETA + progress tables to stdout; the sidecar carries
+              # the same tables. Newer file is primary so restarts win.
+    local s="$1" log out p f src line
+    log="scripts/$s.log"; out="logs/mdrun_${s}.log"
     total_steps=""; total_ps=""; cur_step=""; cur_ps=""; temp=""; pres=""
     fin_eta=""; fin_step=""; log_age=""
-    log_age=$(( $(date +%s) - $(stat -c %Y "$log" 2>/dev/null || echo "$(date +%s)") ))
-    # total: last "N steps, X ps." (prod RESTART appends further starts)
-    line=$(grep -E "^[0-9]+ steps, +[0-9.]+ ps\.$" "$log" | tail -1)
-    if [ -n "$line" ]; then
-        total_steps=$(echo "$line" | awk '{print $1}')
-        total_ps=$(echo "$line" | awk '{print $3}')
+    # order candidates: newer mtime first (a live stdout redirect usually wins)
+    if [ -f "$out" ] && { [ ! -f "$log" ] \
+        || [ "$(stat -c %Y "$out" 2>/dev/null || echo 0)" -gt \
+             "$(stat -c %Y "$log" 2>/dev/null || echo 0)" ]; }; then
+        p="$out"; f="$log"
+    else
+        p="$log"; f="$out"
     fi
-    # mdrun's own ETA: "step N, will finish <date>" (strip the comma)
-    line=$(grep -E "^step [0-9]+, will finish" "$log" | tail -1)
-    if [ -n "$line" ]; then
-        fin_step=$(echo "$line" | awk '{print $2}' | tr -d ',')
-        fin_eta=$(echo "$line" | sed -E 's/^step [0-9]+, will finish //')
-    fi
-    # step/time — tolerant, same as health_report H4 (proven on T3 2024.4)
-    read -r cur_step cur_ps <<< "$(awk '
-        /^ *Step +Time/ { want=1; next }
-        want && NF >= 2 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ { st=$1; t=$2 }
-        END { if (st != "") print st, t }
-    ' "$log")"
-    # temp/pres — best-effort, cols 4/5 of the same table when present
-    read -r temp pres <<< "$(awk '
-        /^ *Step +Time/ { want=1; next }
-        want && NF >= 5 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ \
-             && $4 ~ /^[-0-9.]+$/ && $5 ~ /^[-0-9.]+$/ { tp=$4; pr=$5 }
-        END { if (tp != "") print tp, pr }
-    ' "$log")"
+    for src in "$p" "$f"; do
+        [ -f "$src" ] || continue
+        if [ -z "$log_age" ]; then
+            log_age=$(( $(date +%s) - $(stat -c %Y "$src" 2>/dev/null || echo "$(date +%s)") ))
+        fi
+        # total: last "N steps, X ps." (prod RESTART appends further starts)
+        if [ -z "$total_steps" ]; then
+            line=$(grep -E "^[0-9]+ steps, +[0-9.]+ ps\.$" "$src" | tail -1)
+            if [ -n "$line" ]; then
+                total_steps=$(echo "$line" | awk '{print $1}')
+                total_ps=$(echo "$line" | awk '{print $3}')
+            fi
+        fi
+        # mdrun's own ETA: "step N, will finish <date>" (strip the comma)
+        if [ -z "$fin_step" ]; then
+            line=$(grep -E "^step [0-9]+, will finish" "$src" | tail -1)
+            if [ -n "$line" ]; then
+                fin_step=$(echo "$line" | awk '{print $2}' | tr -d ',')
+                fin_eta=$(echo "$line" | sed -E 's/^step [0-9]+, will finish //')
+            fi
+        fi
+        # step/time — tolerant, same as health_report H4 (proven on T3 2024.4)
+        if [ -z "$cur_step" ]; then
+            read -r cur_step cur_ps <<< "$(awk '
+                /^ *Step +Time/ { want=1; next }
+                want && NF >= 2 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ { st=$1; t=$2 }
+                END { if (st != "") print st, t }
+            ' "$src")"
+        fi
+        # temp/pres — header-aware: gmx layouts differ (Step Time Temp Pres
+        # vs Step Time Lambda Temp Pres …). Reads the Temp/Pres column
+        # positions from the table header; falls back to cols 4/5.
+        if [ -z "$temp" ]; then
+            read -r temp pres <<< "$(awk '
+                /^ *Step +Time/ { want=1; ti=0; pi=0; for (i=1;i<=NF;i++) { if ($i=="Temp") ti=i; if ($i=="Pres") pi=i } next }
+                want && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ {
+                    if (ti && pi && $ti ~ /^-?[0-9.]+$/ && $pi ~ /^-?[0-9.]+$/) { tp=$ti; pr=$pi }
+                    else if (NF >= 5 && $4 ~ /^-?[0-9.]+$/ && $5 ~ /^-?[0-9.]+$/) { tp=$4; pr=$5 }
+                }
+                END { if (tp != "") print tp, pr }
+            ' "$src")"
+        fi
+    done
 }
 
 stage_icon() { # $1 done(0/1)  $2 active-stage  $3 stage-family
@@ -178,13 +213,15 @@ render() {
 
     # ── active MD stage ──
     read -r stage log <<< "$(active_log)"
-    if [ -n "$stage" ]; then parse_log "$stage" "$log"; fi
+    if [ -n "$stage" ]; then parse_log "$stage"; fi
 
     # ── pipeline / artifacts ──
     [ -s scripts/topol.top ] && prep_done=1
     atoms=$(sed -n '2p' scripts/NA53_initial_ionized.gro 2>/dev/null)
-    [ -f scripts/npt2.gro ] && equil_done=1
-    [ -f scripts/prod.xtc ] && prod_done=1
+    # done means mdrun actually FINISHED the stage ("Finished mdrun" in the
+    # gmx log) — a partial prod.xtc/npt2.gro is NOT done
+    grep -q "Finished mdrun" scripts/npt2.log 2>/dev/null && equil_done=1
+    grep -q "Finished mdrun" scripts/prod.log 2>/dev/null && prod_done=1
     n_figs=$(ls results/figures/*.png 2>/dev/null | wc -l)
     [ "$n_figs" -gt 0 ] && ana_done=1
 
@@ -195,8 +232,10 @@ render() {
             for(i=0;i<w;i++) s=s (i<n?"█":"░"); print s }')
     fi
 
-    # ── throughput / ETAs ──
-    if [ -n "$stage" ] && [ -n "$cur_ps" ] && [ -n "$total_ps" ]; then
+    # ── throughput / ETAs (only while the log is FRESH — a stale log is a
+    # dead stage, and its age-based "speed" is meaningless) ──
+    if [ -n "$stage" ] && [ -n "$cur_ps" ] && [ -n "$total_ps" ] \
+       && [ "$log_age" -le 600 ]; then
         if [ -n "$fin_eta" ]; then
             local fe
             fe=$(date -d "$fin_eta" +%s 2>/dev/null || echo "")
@@ -275,13 +314,17 @@ render() {
         echo "    T = ${C_B}${temp}${C_0} K      P = ${C_B}${pres}${C_0} bar"
     elif [ -n "$stage" ] && [ "$stage" = "em" ]; then
         echo "    ${C_D}EM — minimizing, no T/P yet${C_0}"
+    elif [ -z "$stage" ]; then
+        echo "    ${C_D}(no active MD stage — T/P appear once mdrun prints its energy table)${C_0}"
     else
-        echo "    ${C_D}(no energy table yet)${C_0}"
+        echo "    ${C_D}(no T/P in the log table yet)${C_0}"
     fi
 
     echo "  ${C_B}SPEED + ETA${C_0}"
     if [ -n "$nsday" ]; then
         echo "    ns/day ${C_B}${nsday}${C_0}${rate:+  (${rate} steps/s @ 2 fs)}"
+    elif [ -n "$log_age" ] && [ "$log_age" -gt 600 ]; then
+        echo "    ns/day ${C_D}— log stale (${log_age}s old) — no live speed${C_0}"
     else
         echo "    ns/day ${C_D}— need the first energy block${C_0}"
     fi
@@ -298,7 +341,7 @@ render() {
                 'BEGIN{ if (n+0 > 0) printf "%.2f", (t-c)/1000/n; else print 0 }')
             echo "    target ${TARGET_NS} ns at this rate ≈ ${C_B}${d} d${C_0}"
         fi
-    elif [ -n "$stage" ] && [ -n "$total_ps" ]; then
+    elif [ -n "$stage" ] && [ "$stage" != "prod" ] && [ -n "$total_ps" ]; then
         echo "    next  ${C_D}$(next_label "$stage")${C_0}"
     fi
 
@@ -313,6 +356,14 @@ render() {
          "${C_D}target ${TARGET_NS} ns · xtc $(fmt_bytes "$(stat -c %s scripts/prod.xtc 2>/dev/null || echo 0)")${C_0}"
     echo "    04 analysis  $(stage_icon "$ana_done" "$stage" ana)" \
          "${C_D}${n_figs} figure(s)${C_0}"
+
+    # ── raw mdrun output (newest logs/mdrun_*.log) ──
+    local mlog
+    mlog=$(ls -t logs/mdrun_*.log 2>/dev/null | head -1)
+    if [ -n "$mlog" ]; then
+        echo "  ${C_B}LOG${C_0}    ${C_D}tail of ${mlog}${C_0}"
+        tail -n 4 "$mlog" 2>/dev/null | sed "s/^/    ${C_D}/; s/$/${C_0}/"
+    fi
 
     if [ -s logs/run_status.txt ]; then
         echo "  ${C_B}TRAIL${C_0}"
@@ -334,6 +385,15 @@ render() {
         fi
     elif [ -n "$pending" ]; then
         st="⏳ queued — ${pending} waiting (afterok chain)"; stc="$C_Y"
+    elif [ -n "$stage" ]; then
+        # stage log open but no job running: died mid-stage or a manual run
+        if [ "$log_age" -gt 900 ]; then
+            st="⚠️  ${stage} log stopped ${log_age}s ago with no job in queue — job likely died/killed; check sacct + logs/na53_*_*.err"
+            stc="$C_Y"
+        else
+            st="▶ ${stage} log active (${log_age}s old) but no SLURM job — manual/local run?"
+            stc="$C_Y"
+        fi
     else
         st="⏳ idle — chain finished or not submitted"; stc="$C_Y"
     fi

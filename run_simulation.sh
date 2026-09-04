@@ -406,12 +406,11 @@ cmd_monitor() {
             # shellcheck disable=SC2029
             ssh -t "$dest" "${rcd}; bash scripts/health_report.sh --profile $PROFILE_NAME_CUR --quiet-integrity 2>&1 || true; f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); [ -n \"\$f\" ] && tail -n 25 \"\$f\" || true"
         else
-            # one SSH session runs the polling dashboard ON the cluster — the
-            # loop re-reads files + squeue locally, no per-poll 2FA prompts.
-            # Textual TUI preferred; falls back to the bash dashboard.
-            local envh="source \$HOME/miniconda3/etc/profile.d/conda.sh 2>/dev/null || source \$HOME/anaconda3/etc/profile.d/conda.sh 2>/dev/null || true"
+            # one SSH session runs the polling dashboard ON the cluster —
+            # pure bash, zero deps: the loop re-reads files + squeue locally,
+            # no per-poll 2FA prompts.
             # shellcheck disable=SC2029
-            ssh -t "$dest" "${rcd}; ${envh}; conda activate na53_aptamer 2>/dev/null || true; python3 scripts/dashboard_textual.py --profile $PROFILE_NAME_CUR --target-ns ${PROD_NS:-100} --every ${MONITOR_EVERY:-30} 2>/dev/null || bash scripts/live_dashboard.sh --profile $PROFILE_NAME_CUR --target-ns ${PROD_NS:-100} --every ${MONITOR_EVERY:-30}"
+            ssh -t "$dest" "${rcd}; bash scripts/live_dashboard.sh --profile $PROFILE_NAME_CUR --target-ns ${PROD_NS:-100} --every ${MONITOR_EVERY:-30}"
         fi
     else
         echo "Monitoring local run — Ctrl-C to stop."
@@ -422,25 +421,10 @@ cmd_monitor() {
             [ -n "$f" ] && tail -n 20 "$f" || echo "(no md log yet — run ./run_simulation.sh start)"
             return
         fi
-        # live dashboard: Textual TUI when available, bash fallback otherwise.
-        # Try the profile's ENV_SETUP (conda env) first if the bare python3
-        # lacks textual — being in (base) should not cost you the TUI.
-        if ! python3 -c 'import textual' >/dev/null 2>&1; then
-            setup_env 2>/dev/null || true
-            hash -r 2>/dev/null || true
-        fi
-        if python3 -c 'import textual' >/dev/null 2>&1; then
-            # TUI preferred, but never leave the user stranded on a crash:
-            # any non-zero exit (traceback, missing deps) drops into the bash
-            # dashboard, which re-renders the same data in simple lines.
-            python3 scripts/dashboard_textual.py --profile "$PROFILE_NAME_CUR" \
-                --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}" \
-                || bash scripts/live_dashboard.sh --profile "$PROFILE_NAME_CUR" \
-                    --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
-        else
-            bash scripts/live_dashboard.sh --profile "$PROFILE_NAME_CUR" \
-                --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
-        fi
+        # live dashboard: one lightweight pure-bash viewer (no python deps —
+        # runs anywhere, cheap polls: squeue + log sidecar reads).
+        bash scripts/live_dashboard.sh --profile "$PROFILE_NAME_CUR" \
+            --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
     fi
 }
 

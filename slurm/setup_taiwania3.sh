@@ -26,9 +26,15 @@ echo "║  NA53 TAIWANIA 3 SETUP — $(date)              ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
 
-# ─── Step 1: Clone repository ─────────────────────────────
-echo "▶ Step 1/4: Cloning repository..."
-if [ -d "GROMACS_NA53" ]; then
+# ─── Step 1: Locate/clone repository ─────────────────────
+# INCIDENT 2026-09-04: this script used to clone unconditionally when a
+# GROMACS_NA53/ subdir was absent — running it FROM INSIDE a clone nested a
+# second repo (GROMACS_NA53/GROMACS_NA53). Guard: if we are already inside
+# the repo (environment.yml + .git), never clone.
+echo "▶ Step 1/4: Locating repository..."
+if [ -f environment.yml ] && [ -d .git ]; then
+    echo "  ✓ Already inside the repo: $(pwd)"
+elif [ -d GROMACS_NA53 ] && [ -f GROMACS_NA53/environment.yml ]; then
     echo "  ✓ Repository already cloned"
     cd GROMACS_NA53
 else

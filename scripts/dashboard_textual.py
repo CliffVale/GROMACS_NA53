@@ -99,6 +99,24 @@ class NA53Dashboard(App):
         self.refresh_data()
 
     def refresh_data(self) -> None:
+        try:
+            self._refresh()
+        except Exception:
+            # keep the traceback reachable: also write it to a log so a
+            # fullscreen error can be read without fighting terminal capture
+            import traceback
+            try:
+                with open(os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "logs", "dashboard_error.log"), "a") as fh:
+                    fh.write(f"[{dt.datetime.now():%Y-%m-%d %H:%M:%S}] "
+                             + traceback.format_exc() + "\n")
+            except OSError:
+                pass
+            self.notify("refresh error — see logs/dashboard_error.log",
+                        severity="error", timeout=8)
+
+    def _refresh(self) -> None:
         snap = snapshot()
         if snap["stage"] and snap["stage"] != self.last_stage and self.last_stage:
             self.query_one("#logbox", RichLog).write(
@@ -137,18 +155,26 @@ class NA53Dashboard(App):
             return
         bar = self.query_one("#stage_bar", ProgressBar)
         lines = [f"STAGE   {STAGE_LABEL[stage]}"]
-        if d.get("cur_ps") is not None and d.get("total_ps"):
-            pct = min(100, int(d["cur_ps"] / d["total_ps"] * 100))
-            bar.update(progress=d["cur_ps"], total=d["total_ps"])
-            lines.append(f"        {pct}%   sim {d['cur_ps']:.1f} / "
-                         f"{d['total_ps']:.0f} ps")
+        total_ps, cur_ps = d.get("total_ps"), d.get("cur_ps")
+        if cur_ps is not None and total_ps:
+            pct = min(100, int(cur_ps / total_ps * 100))
+            bar.update(progress=min(cur_ps, total_ps), total=total_ps)
+            lines.append(f"        {pct}%   sim {cur_ps:.1f} / "
+                         f"{total_ps:.0f} ps")
+        elif cur_ps is not None:
+            # a Step table but no fixed total (EM converges on Fmax, not steps)
+            lines.append(f"        sim {cur_ps:.1f} ps so far "
+                         f"(EM/restart — no fixed length)")
         else:
             bar.update(progress=0, total=100)
             lines.append(f"        (waiting for first energy block — log age "
                          f"{d.get('age', 0)}s)")
         if d.get("cur_step") is not None:
-            lines.append(f"        step {d['cur_step']:,} / "
-                         f"{d['total_steps'] or '?':,}")
+            ts = d.get("total_steps")
+            if ts:
+                lines.append(f"        step {d['cur_step']:,} / {ts:,}")
+            else:
+                lines.append(f"        step {d['cur_step']:,} (no fixed total)")
         w.update("\n".join(lines))
 
     # ── PHYSICS ──

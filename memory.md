@@ -47,6 +47,7 @@
 | 2026-09-04 | **Local 1 ns trial run exposed config-level bugs → fixed:** ions.mdp kept PME for the pre-neutralization grompp (net charge −22 → fatal); `POSRES_BB` macro never defined by pdb2gmx (→ unused-macro fatal) so NPT1 used plain `POSRES`; missing `refcoord_scaling = com` (PR + posres fatal); MDPs drifted from the locked standard (rcoulomb/rvdw 1.0 vs 0.8 nm, missing shift-Verlet) → unified all stages to the validated 0.8 nm pattern | configs/ions.mdp, nvt.mdp, npt.mdp, npt_free.mdp, prod.mdp |
 | 2026-09-04 | **Trial run, 2nd wave — production & analysis bugs → fixed:** `-gpu-id` invalid in mdrun 2021+ (→ `-gpu_id`); prod mdrun was backgrounded w/o wait → died on shell exit → foreground (all stages consistent); analysis group indices targeted group 4 = **Water** → group 1 = **DNA** for RMSD/RMSF/covar/anaeig/cluster; hbond rewritten in GROMACS 2024+ (stdin piping dead, `-life`/`-ghost` removed) → modern `-r 'group DNA' -t 'group DNA'` selections; sasa duplicate `-o` → `-o` + `-or`; covar `-lpc` removed (2025.3); anaeig needs 2 stdin answers (fit + eigenvector group); cluster `-o` requires `.xpm`; STATUS_FILE/JOBS_DIR anchored to repo root (was split across logs/ + scripts/logs/) | scripts/03_production.sh, scripts/04_analysis.sh, run_simulation.sh |
 | 2026-09-04 | **End-to-end trial re-run PASSED** (post-fix): 0 ⚠️, DNA H-bonds 30–38 (~30 WC bonds for 12 bp — sanity ✓), 1 ns in ~5 min GPU | analysis/, results/figures/ (gitignored, kept locally) |
+| 2026-09-04 | **From-scratch clone-and-run test** (`NA53_1ns_trial_from scratch/`, fresh `git clone` from GitHub = server mimic): **2 packaging bugs caught** — (a) all files committed mode 100644 so `./run_simulation.sh` → Permission denied on a real Linux clone (fixed via `git update-index --chmod=+x`, commit 95eb74b, verified 755 materializes on clone); (b) `.gitignore` globs `em.*`/`nvt.*`/`npt*.*` (meant for grompp/mdrun OUTPUTS) silently swallowed the **stage MDP configs** → fresh clone lacked em/nvt/npt/npt_free.mdp and equil died at EM grompp (`../configs/em.mdp does not exist`) (fixed with `!em.mdp` etc. negations, commit aadddb9). After fixes the clone ran prep→equil→1 ns prod→analysis→8 figures with 0 ⚠️ | commits 95eb74b, aadddb9 |
 
 ## 3. Files — Current Ownership & Status
 
@@ -111,10 +112,10 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | `docs/HPC_GPU_OPTIONS.md` | ✅ | platform evidence + §5 on-node checklist |
 
 ### 3.7 Currently being worked on
-- **Session complete** — next edit is the pending **commit + push** of:
-  research/, profiles/, run_simulation.sh, docs/HPC_GPU_OPTIONS.md +
-  modified configs/scripts/slurm/.gitignore/README/architecture/memory + CI.
-- After that: Phase 4 (cluster setup run) and Phase 5 (real NA53 PDB).
+- **Session complete.** Clone-and-run test in
+  `../NA53_1ns_trial_from scratch/` (sibling dir, outside repo) passed after
+  the two packaging fixes; nothing mid-edit in the repo.
+- Next: Phase 4 (cluster setup run) and Phase 5 (real NA53 PDB).
 
 ---
 
@@ -170,21 +171,18 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 
 ## 6. Next Actions (priority order)
 
-1. **Agent:** commit + push this session's work (Research SOP + GPU analysis +
-   launcher/profiles + consistency fixes + **trial-driven prod/analysis/config
-   fixes**) — repo `CliffVale/GROMACS_NA53` exists. `.gitignore` now excludes
-   generated analysis/ + results/; trial junk already cleaned.
-2. **User/Agent:** run Phase 4 on Taiwania 3: `bash slurm/setup_taiwania3.sh
+1. **User/Agent:** run Phase 4 on Taiwania 3: `bash slurm/setup_taiwania3.sh
    <repo-url>`, `conda activate na53_aptamer`, `gmx --version` → expect 2024.4,
-   then `./run_simulation.sh submit --profile taiwania3_cpu`.
-3. **User:** request GPU access on T3 via iService (see docs/HPC_GPU_OPTIONS.md);
+   then `./run_simulation.sh submit --profile taiwania3_cpu`. (Clone-and-run is
+   verified end-to-end locally — no packaging surprises expected.)
+2. **User:** request GPU access on T3 via iService (see docs/HPC_GPU_OPTIONS.md);
    when granted, run the §5 checklist and paste back → fill `taiwania3_gpu.env`.
-4. **Agent (Phase 5):** generate `structures/NA53_initial.pdb` via AptaFold or
+3. **Agent (Phase 5):** generate `structures/NA53_initial.pdb` via AptaFold or
    w3DNA; validate with `bash scripts/00_predict_structure.sh`.
-5. **Agent (Phase 6+):** submit the chain and gate each stage
+4. **Agent (Phase 6+):** submit the chain and gate each stage
    (`./run_simulation.sh status` between jobs).
-6. **Agent:** after each stage, update this file's §2/§3/§6.
-7. **Agent:** next research task goes through `research/WORKFLOW.md` (new report
+5. **Agent:** after each stage, update this file's §2/§3/§6.
+6. **Agent:** next research task goes through `research/WORKFLOW.md` (new report
    in `research/reports/`, sources in `REFERENCES.md`, one line in
    `research/deepsearch.log`).
 

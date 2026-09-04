@@ -11,7 +11,16 @@
 
 ---
 
-## 1. Executive Summary
+---
+> ⚠️ **VALIDATION BANNER (2026-09-04):** this charter records the *original plan*
+> (2026-09-02). Where its numbers differ from what actually runs, the ✅-annotated
+> `configs/*.mdp` files are the **running truth** — notably: cutoffs are **0.8 nm**
+> (not 1.0 nm), the thermostat is **V-rescale** (not Nosé–Hoover), and the
+> implemented force field is `amber99sb-ildn` (the `bsc1`/`parmbsc1` upgrade is a
+> tracked decision, see `memory.md` Q7). Root cause & prevention of this drift:
+> `docs/INCIDENT_ANALYSIS.md` class P.
+
+## 1. Executive Summary## 1. Executive Summary
 
 This project establishes a reproducible, literature-validated GROMACS molecular dynamics simulation pipeline for predicting the 3D folded structure of nucleic acid aptamers intended for biosensing applications. The pipeline spans from sequence input through production MD and thermodynamic/biosensing-relevant analysis, following established protocols (E2EDNA2, literature SOPs).
 

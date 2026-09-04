@@ -9,7 +9,15 @@
 
 ---
 
-## 1. Scope Overview
+---
+> ⚠️ **VALIDATION BANNER (2026-09-04):** this scope matrix records the *original
+> plan* (2026-09-02). Where it differs from what actually runs, the ✅-annotated
+> `configs/*.mdp` files are the **running truth** — cutoffs **0.8 nm** (not 1.0),
+> thermostat **V-rescale** (not Nosé–Hoover), default DNA FF `amber99sb-ildn`
+> (parmbsc1/bsc1 upgrade tracked in `memory.md` Q7). Root cause & prevention:
+> `docs/INCIDENT_ANALYSIS.md` class P.
+
+## 1. Scope Overview## 1. Scope Overview
 
 This document defines the explicit boundaries of the aptamer 3D folding simulation pipeline — what is included, what is excluded, and the precise parameter matrix governing every simulation stage.
 

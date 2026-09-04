@@ -338,7 +338,7 @@ so runs are reproducible), `prod.xtc` (trajectory movie), `prod.edr`
 **Timing reality check** (measured on our test system):
 - Workstation GPU test (22k atoms, 1 ns): **~5–6 minutes**.
 - Taiwania 3 CPU (real 55-nt system, ~35–45k atoms): **~40–70 ns/day** expected
-  → 100 ns fits in ~2–3 days, inside the 4-day partition limit. If the queue
+  → 100 ns ≈ 1.5–2.5 days, inside the 4-day partition limit. If the queue
   kills the job at the wall-time, restart with `RESTART=1` — it resumes from the
   checkpoint automatically.
 

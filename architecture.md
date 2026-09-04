@@ -63,6 +63,8 @@ GROMACS_NA53/
 │   ├── 04_RACI_MATRIX.md
 │   ├── 05_BUDGET_TRACKER.md
 │   ├── 06_KPI_DASHBOARD.md
+│   ├── BEGINNER_GUIDE.md         # 🎓 zero-knowledge walkthrough (start here if new to MD)
+│   ├── GLOSSARY.md                # 📖 plain-language dictionary of every term
 │   ├── APTAMD_DEEP_ANALYSIS.md
 │   ├── LESSONS_LEARNED_FROM_TRIAL_RUNS.md
 │   └── TRANSCRIPTS_DEEP_ANALYSIS.md

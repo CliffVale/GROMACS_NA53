@@ -54,3 +54,8 @@ does the search.
   `configs/` are the verified Taiwania-3 implementation.
 - `reports/2026-09-03-aptamer-biosensor-deepsearch.md` — aptamer-in-silico toolchain
   survey (2D/3D/docking/MD/ML/COMSOL) with confidence-graded evidence table.
+- `reports/2026-09-04-aptamer-bibliography-analysis.md` — 67-reference bibliography
+  analysis (opened 6 key sources: AF3-for-aptamers, cTnI ssDNA protocol, Dans B-DNA
+  FF accuracy, TBA GQ MSM, RNA-aptamer 3D+MD, GROMACS mdrun-perf) with pipeline
+  actions R1–R6; 61 sources screened-only and labeled.- `reports/2026-09-03-aptamer-biosensor-deepsearch.md` — aptamer-in-silico toolchain
+  survey (2D/3D/docking/MD/ML/COMSOL) with confidence-graded evidence table.

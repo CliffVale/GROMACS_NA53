@@ -214,9 +214,13 @@ group indices, packaging) is classified with its prevention in
 | Problem | Solution |
 |---|---|
 | `gmx: command not found` | `conda activate na53_aptamer` (GROMACS ships in the env) |
-| Job killed at wall-time | `cd slurm && RESTART=1 sbatch 03_prod.sbatch` (resumes from `.cpt`) |
+| Job killed at wall-time | Normal for `ct56` (4-day). `cd slurm && RESTART=1 sbatch 03_prod.sbatch` (resumes from `prod.cpt`) |
 | `Fatal error: GPU…` | You're on CPU — use `-nb auto`, never `-nb gpu` |
 | `pdb2gmx` fails on your PDB | Residue names must be DNA (DA/DT/DG/DC), not protein (A/T/G/C) |
+| EM not converging | `emtol`/`emstep` live in `configs/em.mdp` (defaults: 1000 kJ/mol/nm, 0.01 nm) — lower `emstep` to 0.001 for stubborn cases |
+| NVT temperature drifting | Check `ref-t` (310.15 K) and `tc-grps` (DNA + Water_and_ions) in `configs/nvt.mdp`; the validated `tau-t` 0.1 ps is locked — first rerun EM if contacts were bad, then extend NVT |
+| NPT density unstable | Extend NPT — raise `nsteps` in `configs/npt.mdp` / `npt_free.mdp` (validated schedule: 100 ps restrained + 500 ps free) |
+| Production crashes mid-run | Manual resume: `gmx mdrun -deffnm prod -cpi prod.cpt` · SLURM resume: `RESTART=1 sbatch slurm/03_prod.sbatch` |
 | `doctor` flags something | Read its message; each check names the exact file/flag to fix |
 | SLURM job rejected | `sacctmgr show assoc user=$USER` → match account/partition in `slurm/*.sbatch` |
 | SSH "account doesn't exist" | Register your OTP device via iService (會員資訊 → 主機帳號資訊 → 建立OTP載具) |

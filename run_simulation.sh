@@ -430,8 +430,13 @@ cmd_monitor() {
             hash -r 2>/dev/null || true
         fi
         if python3 -c 'import textual' >/dev/null 2>&1; then
+            # TUI preferred, but never leave the user stranded on a crash:
+            # any non-zero exit (traceback, missing deps) drops into the bash
+            # dashboard, which re-renders the same data in simple lines.
             python3 scripts/dashboard_textual.py --profile "$PROFILE_NAME_CUR" \
-                --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
+                --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}" \
+                || bash scripts/live_dashboard.sh --profile "$PROFILE_NAME_CUR" \
+                    --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
         else
             bash scripts/live_dashboard.sh --profile "$PROFILE_NAME_CUR" \
                 --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"

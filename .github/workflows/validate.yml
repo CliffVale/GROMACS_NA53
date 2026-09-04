@@ -112,7 +112,8 @@ jobs:
       - name: Check no CHANGE_ME placeholders in committed sbatch files
         run: |
           set -euo pipefail
-          if grep -rn "CHANGE_ME" slurm/ scripts/ 2>/dev/null; then
+          # exclude the integrity checker: its header documents the C4 pattern it scans for
+          if grep -rn "CHANGE_ME" slurm/ scripts/ --exclude=check_repo_integrity.sh 2>/dev/null; then
             echo "❌ Unresolved CHANGE_ME placeholder committed"
             exit 1
           fi

@@ -13,7 +13,7 @@
 #   ./run_simulation.sh start  [--profile NAME] [--ns N] [--stage all|prep|equil|prod|analysis] [--pdb FILE]
 #   ./run_simulation.sh submit [--profile NAME] [--ns N] [--dry-run]
 #   ./run_simulation.sh status [--profile NAME] [--local]   # snapshot incl. health report (H1-H4)
-#   ./run_simulation.sh monitor [--profile NAME] [--once]    # health report + live md log tail
+#   ./run_simulation.sh monitor [--profile NAME] [--once]    # LIVE dashboard (job/stage/T-P/ns-day/ETA, polls every 30 s; --once = snapshot)
 #   (status & monitor run scripts/health_report.sh — doctor-style ✅/⚠️/❌ —
 #    locally AND over SSH, so cluster jobs report health the same way)
 #
@@ -401,23 +401,28 @@ cmd_monitor() {
         echo "Monitoring remote $SSH_HOST — Ctrl-C to stop."
         echo "NOTE: Taiwania 3 requires 2FA — you will be asked for an OTP."
         local dest; dest=$(remote_dest); local rcd; rcd=$(remote_cd)
-        local hr="bash scripts/health_report.sh --profile $PROFILE_NAME_CUR --quiet-integrity 2>&1 || true"
         if [ "$once" = "1" ]; then
+            # snapshot: health report + md log tail, then exit
             # shellcheck disable=SC2029
-            ssh -t "$dest" "${rcd}; echo '── health report ──'; ${hr}; echo '── SLURM ──'; squeue -u \$(whoami); f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); echo '── \$f ──'; tail -n 25 \"\$f\" 2>/dev/null || true"
+            ssh -t "$dest" "${rcd}; bash scripts/health_report.sh --profile $PROFILE_NAME_CUR --quiet-integrity 2>&1 || true; f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); [ -n \"\$f\" ] && tail -n 25 \"\$f\" || true"
         else
+            # one SSH session runs the polling dashboard ON the cluster — the
+            # loop re-reads files + squeue locally, no per-poll 2FA prompts.
             # shellcheck disable=SC2029
-            ssh -t "$dest" "${rcd}; echo '── health report ──'; ${hr}; echo '── SLURM ──'; squeue -u \$(whoami); f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); echo \"── tail -f \\\$f ──\"; tail -f \"\$f\" 2>/dev/null || tail -f logs/*.out"
+            ssh -t "$dest" "${rcd}; bash scripts/live_dashboard.sh --profile $PROFILE_NAME_CUR --target-ns ${PROD_NS:-100} --every ${MONITOR_EVERY:-30}"
         fi
     else
         echo "Monitoring local run — Ctrl-C to stop."
-        echo "── health report ──"
         bash scripts/health_report.sh --profile "$PROFILE_NAME_CUR" --quiet-integrity || true
-        echo "── live md log tail (Ctrl-C to stop) ──"
-        local f; f=$(ls -t logs/mdrun_*.log 2>/dev/null | head -1 || true)
-        [ -n "$f" ] && tail -n 20 "$f" || echo "(no md log yet — run ./run_simulation.sh start)"
-        [ "$once" = "1" ] && return
-        [ -n "$f" ] && tail -f "$f"
+        echo ""
+        if [ "$once" = "1" ]; then
+            local f; f=$(ls -t logs/mdrun_*.log 2>/dev/null | head -1 || true)
+            [ -n "$f" ] && tail -n 20 "$f" || echo "(no md log yet — run ./run_simulation.sh start)"
+            return
+        fi
+        # live dashboard: polls (default 30 s, override with MONITOR_EVERY)
+        bash scripts/live_dashboard.sh --profile "$PROFILE_NAME_CUR" \
+            --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
     fi
 }
 

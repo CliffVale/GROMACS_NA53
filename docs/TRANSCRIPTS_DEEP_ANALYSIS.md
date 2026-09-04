@@ -120,7 +120,7 @@ scontrol show partition | grep -E "PartitionName|TRES|DefaultTime"
 ```
 
 - If a partition lists GPUs (`%G` column shows `gpu:*`): use `install_gromacs_gpu.sh` and `-nb gpu`.
-- If not (likely, CPU-first cluster): use the conda CPU build or a CPU-only source build. A 55-nt aptamer in TIP3P (~35–45k atoms) runs fine on 56 CPU cores — expect **~40–100 ns/day** with AVX-512, so 100 ns production is a 1–2.5 day job. Completely viable.
+- If not (likely, CPU-first cluster): use the conda CPU build or a CPU-only source build. A 75-nt aptamer in TIP3P (~45–65k atoms) runs fine on 56 CPU cores — expect **~40–100 ns/day** with AVX-512, so 100 ns production is a 1–2.5 day job. Completely viable.
 
 ### Expected cost (from verified GP1 rates, if using bio nodes)
 | Stage | Nodes | Est. core/GPU-hr | NSTC cost |
@@ -138,7 +138,7 @@ scontrol show partition | grep -E "PartitionName|TRES|DefaultTime"
 1. **[DONE]** Verify account: `u5662994` added to project; OTP device registered.
 2. **[NEXT]** On Taiwania 3: run `sinfo -s` + `module avail openmpi` + `module show cuda/12.0.0` → paste output → finalize partition/module lines in `slurm/*.sbatch`.
 3. **[NEXT]** Decide GPU vs CPU (decision gate above), then run `setup_taiwania3.sh` + `install_gromacs_gpu.sh` (or conda CPU build).
-4. **[NEXT]** `bash 00_predict_structure.sh` to build the NA53 initial model (55 nt, B-form fallback) — upload any better model (RNAComposer/3dRNA/DSSR-annotated) if available.
+4. **[NEXT]** `bash 00_predict_structure.sh` to build the NA53 initial model (75 nt, B-form fallback) — upload any better model (RNAComposer/3dRNA/DSSR-annotated) if available.
 5. **[NEXT]** `sbatch 01_prep.sbatch` → `02_equil.sbatch` → `03_prod.sbatch` (100 ns default) → `04_analysis.sbatch`.
 6. **[LATER]** Conformational-switching analysis (two-state clustering, FEL) — the 1BNA session proved the exact toolchain (gromos clustering + FEL) works.
 7. **[LATER]** NA53–NGAL complex: PDB 1X71 target; ensemble docking + MM-PBSA per APTAMD protocol once the free-aptamer fold is converged.
@@ -171,7 +171,7 @@ A second live session on Taiwania 3 replaced guesses with facts and **reversed o
 | Setup compiled GROMACS from source | Too many missing pieces; policy restricts login-node builds | `setup_taiwania3.sh` now: conda env create (env ships gromacs) + validation only |
 | `-nb gpu` mdrun flags | No GPU build possible | All sbatch/scripts default to `-nb auto` (resolves to CPU here); explicit GPU flags preserved only in `03_production.sh` for the local GTX machine |
 
-**Throughput expectation (CPU, ct56, 56 threads, ~35–45k atoms):** ~40–70 ns/day → 100 ns fits the 4-day `ct56` limit; `RESTART=1 sbatch 03_prod.sbatch` continues from `prod.cpt` if a job hits the wall.
+**Throughput expectation (CPU, ct56, 56 threads, ~45–65k atoms):** ~15–45 ns/day → 100 ns needs the checkpointed RESTART path across the 4-day `ct56` limit; `RESTART=1 sbatch 03_prod.sbatch` continues from `prod.cpt` if a job hits the wall.
 
 **Cost sanity (from GP1 academic rates):** ~50 CPU-core-hr per 100 ns → well under 10 NTD per full pipeline. Budget is not a concern.
 

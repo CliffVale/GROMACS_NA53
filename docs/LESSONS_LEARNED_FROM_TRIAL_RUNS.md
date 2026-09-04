@@ -296,7 +296,7 @@ STEP 6: Analysis
 | AMBER99SB, 0.8 nm cutoff, GPU, CLI | 245 ns/day | ✅ Best local |
 | AMBER99SB, 0.8 nm cutoff, GPU, CLI, optimized | 257 ns/day | 🏆 Best |
 
-**For NA53 (55 nt, ~50k atoms):** Expect ~50-100 ns/day on GTX 1650 Ti
+**For NA53 (75 nt, ~50–65k atoms):** Expect ~40–90 ns/day on GTX 1650 Ti
 
 ---
 

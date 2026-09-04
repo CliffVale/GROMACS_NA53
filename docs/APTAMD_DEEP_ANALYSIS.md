@@ -140,7 +140,7 @@
 ```
 
 #### ② GaMD for Enhanced Sampling
-**Why:** Standard MD may take microseconds to fold a 55-nt aptamer. GaMD can explore the landscape in 1–2 days of GPU time.
+**Why:** Standard MD may take microseconds to fold a 75-nt aptamer. GaMD can explore the landscape in 1–2 days of GPU time.
 
 **Action for NA53:**
 - If AMBER is available on Taiwania 3: Use APTAMD directly for the GaMD stage

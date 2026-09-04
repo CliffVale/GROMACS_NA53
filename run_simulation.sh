@@ -228,8 +228,8 @@ cmd_start() {
 # Generates slurm/jobs/*_<profile>.sbatch from the verified templates, patching
 # partition/account/time/cpus/mem (+ optional gres) and swapping the environment
 # block for the profile's ENV_SETUP, then submits 01→02→03→04 with afterok deps.
-generate_jobs() { # $1 = profile name
-    local prof="$1"
+generate_jobs() { # $1 = profile name, $2 = production length in ns (default for the 03 job)
+    local prof="$1" ns_def="${2:-100}"
     local jobs=()
     rm -rf "$JOBS_DIR"; mkdir -p "$JOBS_DIR"
     for base in "${STAGES_SBATCH[@]}"; do
@@ -253,6 +253,10 @@ generate_jobs() { # $1 = profile name
             -e "s|^#SBATCH --cpus-per-task=.*|#SBATCH --cpus-per-task=${C}|" \
             -e "s|^#SBATCH --mem=.*|#SBATCH --mem=${M}|" \
         > "$out"
+        if [ "$base" = "03_prod" ] && [ "$ns_def" != "100" ]; then
+            # honor --ns: template's NS_LENGTH default is 100 — override in the generated job
+            sed -i "s|NS_LENGTH=\"\${1:-100}\"|NS_LENGTH=\"\${1:-$ns_def}\"|" "$out"
+        fi
         if [ -n "${GRES:-}" ]; then
             # one --account= line exists in every template header — append gres after it
             grep -q -- "--gres=" "$out" || sed -i "/^#SBATCH --account=/a #SBATCH --gres=${GRES}" "$out"
@@ -285,7 +289,7 @@ cmd_submit() {
     local prof="$PROFILE_NAME_CUR"
     echo "== submit | profile=$prof partition=$PARTITION gres='${GRES:-none}' ns=${ns:-$PROD_NS} =="
     echo "Generating jobs from verified templates → $JOBS_DIR/"
-    generate_jobs "$prof"
+    generate_jobs "$prof" "${ns:-$PROD_NS}"
 
     if [ "$dry" = "1" ]; then
         echo ""

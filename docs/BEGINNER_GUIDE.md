@@ -203,7 +203,7 @@ structure** — the local folding pattern (which regions pair with which, e.g.
 stem-loops) — using `seqfold` (or RNAfold as a fallback).
 
 **What it does *not* do.** It refuses to invent a fake 3D structure. Producing a
-real all-atom 3D model of a 55-nt DNA aptamer is genuinely hard (that is a big
+real all-atom 3D model of a 75-nt DNA aptamer is genuinely hard (that is a big
 part of the science), so the script **fails loudly with instructions** rather
 than silently writing a wrong `.pdb`. Honest failure is a design principle of
 this repo (see `rules.md`).
@@ -216,7 +216,7 @@ helix models from sequence), AptaFold, and AlphaFold 3 — each with caveats.
 
 | | File | Meaning |
 |---|---|---|
-| in | (NA53 sequence, hard-coded default) | our 55 nt |
+| in | (NA53 sequence, hard-coded default) | our 75 nt |
 | out | `structures/NA53_secondary.dbn` | dot-bracket notation: `(((...)))` shows pairing |
 | out | `structures/NA53.fasta` | sequence in FASTA format |
 | required | `structures/NA53_initial.pdb` | **the real 3D starting structure** — see box below |
@@ -268,7 +268,7 @@ tracked, documented decision, not yet applied.
 | in | `../structures/NA53_initial.pdb` | the 3D structure from stage 00 |
 | out | `topol.top` (+ `*.itp`) | topology rulebook |
 | out | `NA53_processed.gro` → `NA53_boxed.gro` → `NA53_solvated.gro` → `NA53_ionized.gro` | the system at each step |
-| sanity | ~22,000 atoms for the small test duplex; ~35–45k for real 55-nt NA53 | more atoms = longer compute |
+| sanity | ~22,000 atoms for the small test duplex; ~45–65k for real 75-nt NA53 | more atoms = longer compute |
 
 ---
 
@@ -337,7 +337,7 @@ so runs are reproducible), `prod.xtc` (trajectory movie), `prod.edr`
 
 **Timing reality check** (measured on our test system):
 - Workstation GPU test (22k atoms, 1 ns): **~5–6 minutes**.
-- Taiwania 3 CPU (real 55-nt system, ~35–45k atoms): **~40–70 ns/day** expected
+- Taiwania 3 CPU (real 75-nt system, ~45–65k atoms): **measure ns/day from the smoke run** (planning band ~15–45 ns/day on 56 AVX2 cores; 100 ns ≈ 2–6 days wall → checkpointed)
   → 100 ns ≈ 1.5–2.5 days, inside the 4-day partition limit. If the queue
   kills the job at the wall-time, restart with `RESTART=1` — it resumes from the
   checkpoint automatically.

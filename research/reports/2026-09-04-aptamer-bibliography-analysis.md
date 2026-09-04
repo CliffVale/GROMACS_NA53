@@ -108,7 +108,7 @@ everything else is **screened** (title/venue metadata only, no content claims).
 
 | # | Action | Evidence | Confidence |
 |---|---|---|---|
-| R1 | **Phase 5: try AlphaFold 3 for the NA53 3D model first**, alongside w3DNA/3dDNAi; relax the top model through our existing equil before production; keep seqfold/UNAFold 2D as input | #11 (aptamer GQ/pseudoknot OK; expect lower confidence for non-PDB 55-nt), #6 (MD refines predicted models) | high |
+| R1 | **Phase 5: try AlphaFold 3 for the NA53 3D model first**, alongside w3DNA/3dDNAi; relax the top model through our existing equil before production; keep seqfold/UNAFold 2D as input | #11 (aptamer GQ/pseudoknot OK; expect lower confidence for non-PDB 75-nt), #6 (MD refines predicted models) | high |
 | R2 | **Reconsider DNA force field: parmbsc1 (or OL15) instead of amber99sb-ildn's parm99-era DNA**, using gmx ports #31/#34 or amber99bsc1 (user-contributions); validate with a local trial + rerun of `check_repo_integrity` before committing; record as decision-log entry | #30 (only bsc1/bsc0OL15 multi-µs predictive) | high (physics) / medium (effort: re-validate) |
 | R3 | Keep TIP3P (no change) — OPC/TIP4PD can destabilize nucleic-acid structure | #40 (title-screened) | low (screened) |
 | R4 | No de novo folding in cMD; if a folding-sampling study is ever desired, scope a separate replica-exchange/metadynamics project (menu in §1.3) | #36 + our E2EDNA lit-review | high |

@@ -12,7 +12,7 @@
 
 ## 1. Executive Summary
 
-**GROMACS_NA53** is an in-silico pipeline that predicts the 3D folded structure of the **NA53 DNA aptamer** (55 nucleotides, targeting NGAL/Lipocalin-2 for biosensing) via **Molecular Dynamics (MD) simulation** with GROMACS, executed on the **Taiwania 3 HPC cluster** (CPU partitions). The pipeline covers: secondary-structure prediction → all-atom 3D model → system solvation/ionization → energy minimization → NVT/NPT equilibration → production MD → conformational analysis (RMSD, RMSF, Rg, H-bonds, PCA, clustering, free-energy landscape) → publication-grade figures.
+**GROMACS_NA53** is an in-silico pipeline that predicts the 3D folded structure of the **NA53 DNA aptamer** (75 nucleotides, targeting NGAL/Lipocalin-2 for biosensing) via **Molecular Dynamics (MD) simulation** with GROMACS, executed on the **Taiwania 3 HPC cluster** (CPU partitions). The pipeline covers: secondary-structure prediction → all-atom 3D model → system solvation/ionization → energy minimization → NVT/NPT equilibration → production MD → conformational analysis (RMSD, RMSF, Rg, H-bonds, PCA, clustering, free-energy landscape) → publication-grade figures.
 
 The purpose is twofold:
 1. **Scientific**: obtain the 3D fold and conformational ensemble of NA53, identify binding-competent conformations, and provide a structural basis for NGAL biosensor design.
@@ -23,7 +23,7 @@ The purpose is twofold:
 ## 2. Problem Statement & Background
 
 ### 2.1 Scientific problem
-NA53 is a 55-nt single-stranded DNA aptamer with reported nanomolar affinity (Kd ≈ 32.52 nM) for NGAL (Neutrophil Gelatinase-Associated Lipocalin), a biomarker for acute kidney injury. Biosensing applications require knowing its **3D structure and conformational behavior**, but ssDNA aptamers are flexible and their binding-competent conformation is unknown a priori.
+NA53 is a 75-nt single-stranded DNA aptamer with reported nanomolar affinity (Kd ≈ 32.52 nM) for NGAL (Neutrophil Gelatinase-Associated Lipocalin), a biomarker for acute kidney injury. Biosensing applications require knowing its **3D structure and conformational behavior**, but ssDNA aptamers are flexible and their binding-competent conformation is unknown a priori.
 
 ### 2.2 Engineering problem
 MD pipelines fail silently for three reasons, all encountered in our trial runs (GROMACS_TEEP):
@@ -98,7 +98,7 @@ This project exists to eliminate those failure classes by recording **only what 
 
 | Category | Requirement |
 |---|---|
-| **Performance** | ≥40 ns/day on Taiwania 3 `ct56` (56 cores) for ~35–45k-atom system; 100 ns ≤ 4-day walltime |
+| **Performance** | ≥40 ns/day on Taiwania 3 `ct56` (56 cores) for ~45–65k-atom system; 100 ns ≤ 4-day walltime |
 | **Portability** | Runs on CPU-only clusters; `-nb auto` default; local GTX 1650 Ti optional GPU path |
 | **Reproducibility** | conda env pinned (`gromacs=2024.4`, python 3.10); deterministic seeds in MDPs; versions logged |
 | **Storage** | Trajectories `.xtc` only (compressed); `.trr` never written; ≤50 GB working set; backup policy in docs/05 |
@@ -119,7 +119,7 @@ This project exists to eliminate those failure classes by recording **only what 
 | Production throughput | ≥40 ns/day (CPU) | mdrun log `Performance` line |
 | RMSD convergence | Plateau in last 50% of run | rmsd.xvg |
 | Job success rate | 100% of submitted jobs complete or cleanly restart | slurm job logs |
-| Rg stability | 1.5–3.0 nm plateau (55-nt ssDNA) | gyrate.xvg |
+| Rg stability | 1.5–3.5 nm plateau (75-nt ssDNA) | gyrate.xvg |
 
 ---
 

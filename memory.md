@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Active |
 | **Last updated** | 2026-09-04 |
-| **Current phase** | Phase 4/5 — local 1 ns end-to-end trial PASSED; commit+push pending |
+| **Current phase** | Phase 5 — real 75-nt NA53 structure: AF3 run by user (in progress); run-readiness layer + T3 runbook ready (CLUSTER_RUNBOOK) |
 
 > **Purpose:** the single source of truth for *what has been done, what is being
 > worked on, and what comes next*. Any AI resuming this project must read this
@@ -21,8 +21,8 @@
   NPT → 1 ns prod (~5 min) → all 8 analyses → 8 figures. Zero warnings.
 - 🔵 Phase 4 (Taiwania 3 setup) scripted + mostly verified live; env install
   still needs one run on the cluster.
-- ⬜ **Phase 5**: obtain the real `structures/NA53_initial.pdb` (NA53 sequence).
-- ⏸ Nothing blocked; trial-driven bug fixes below are staged for commit.
+- ⬜ **Phase 5 (in progress)**: real 75-nt NA53 structure — user generates via AlphaFold 3, drops it in `structures/`, validator (`scripts/validate_na53_pdb.py`) gates it, then `docs/CLUSTER_RUNBOOK.md` drives the T3 run.
+- 🟦 **2026-09-04 correction: NA53 is 75 nt, not 55 nt** — the pasted sequence and the Hong-2019 primary-source transcription (lit-review C2) both give 75 nt (20 fixed + 35 random + 20 fixed); the '55-nt' figure was a miscount that had propagated through README/PRD/GLOSSARY/BEGINNER_GUIDE/HPC docs. All corrected; canonical seq in `structures/NA53.fasta`; `validate_na53_pdb.py` enforces it (rejects the 55-nt impostor).
 
 ---
 
@@ -55,6 +55,7 @@
 | 2026-09-04 | **Gap-audit round after the beginner pass** — restored 4 troubleshooting rows dropped in the README rewrite (EM/NVT/NPT/crash-resume) with config-consistent wording (validated tau-t 0.1 not the old 2.0 advice); added ✅-config validation banners to docs/01 charter + docs/02 scope (they still carried pre-validation 1.0 nm / Nosé–Hoover / AMBER99bsc1 values) pointing to configs/*.mdp as running truth + INCIDENT_ANALYSIS class P; registered BEGINNER_GUIDE + GLOSSARY in architecture.md docs tree; added the 09-04 bibliography report to research/README 'Current reports'; corrected guide timing math (100 ns ≈ 1.5–2.5 d at 40–70 ns/day). Repo-wide dead-link audit: 0 dead relative links | README.md §9, docs/01, docs/02, architecture.md, research/README.md, docs/BEGINNER_GUIDE.md |
 | 2026-09-04 | **Beginner-friendly documentation pass** — new `docs/BEGINNER_GUIDE.md` (zero-knowledge walkthrough: science primer, repo map, stage-by-stage pipeline, 3 ways to run, results sanity checklist, troubleshooting) and `docs/GLOSSARY.md` (plain-language dictionary of every term). README rewritten beginner-first (plain intro, reading paths, annotated structure, one-glance pipeline) and its parameter table **corrected to the running truth**: FF row now states `amber99sb-ildn` + TIP3P (not AMBER99bsc1) with parmbsc1 flagged under evaluation; cutoffs **1.0 → 0.8 nm**; thermostat V-rescale (not Nosé–Hoover) — matching the ✅ configs and docs/INCIDENT_ANALYSIS class P | docs/BEGINNER_GUIDE.md, docs/GLOSSARY.md, README.md |
 
+| 2026-09-04 | **Cluster-run readiness + 75-nt correction** — NA53 proven **75 nt** (pasted sequence + lit-review C2 both 75; '55-nt' was a propagated miscount) → corrected README/PRD/GLOSSARY/BEGINNER_GUIDE/HPC_GPU_OPTIONS/LESSONS_LEARNED/TRANSCRIPTS/bibliography/profiles/00 script; added `structures/NA53.fasta` (canonical, provenance-header) + `scripts/validate_na53_pdb.py` (AF3/3D-model gate: length/identity/completeness incl. sugar atoms, altLoc, chain; in-memory `--selftest`; rejects the 55-nt impostor); **fixed launcher bug: `submit --ns N` was ignored** (generate_jobs never templated it — smoke would have silently run 100 ns) → ns threaded into generated 03 job (dry-run verified: `--ns 1` → `NS_LENGTH="${1:-1}"`); wrote `docs/CLUSTER_RUNBOOK.md` (75-nt-aware T3 walkthrough: validate→setup→doctor→1 ns smoke→measure ns/day→archive→100 ns prod→RESTART→fetch) | structures/NA53.fasta, scripts/validate_na53_pdb.py, docs/CLUSTER_RUNBOOK.md, run_simulation.sh, docs sweep |
 ## 3. Files — Current Ownership & Status
 
 ### 3.1 AI-reference layer (root) — all complete, maintained here

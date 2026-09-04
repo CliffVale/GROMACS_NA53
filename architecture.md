@@ -64,6 +64,7 @@ GROMACS_NA53/
 │   ├── 05_BUDGET_TRACKER.md
 │   ├── 06_KPI_DASHBOARD.md
 │   ├── BEGINNER_GUIDE.md         # 🎓 zero-knowledge walkthrough (start here if new to MD)
+│   ├── CLUSTER_RUNBOOK.md        # 🚀 exact T3 commands: validate → doctor → smoke → prod
 │   ├── GLOSSARY.md                # 📖 plain-language dictionary of every term
 │   ├── APTAMD_DEEP_ANALYSIS.md
 │   ├── LESSONS_LEARNED_FROM_TRIAL_RUNS.md
@@ -105,7 +106,7 @@ GROMACS_NA53/
 │   ├── deepsearch.log          # JSONL run log (tracked)
 │   ├── reports/                # completed research reports
 │   └── scripts/                # s2_search.py, log_run.py
-├── structures/                 # INPUT PDB (the one file you must provide)
+├── structures/                 # INPUT: NA53.fasta (canonical 75-nt) + NA53_initial.pdb (validated 3D model)
 ├── system/                     # processed/boxed/solvated/ionized
 ├── equilibration/              # em/nvt/npt outputs
 ├── production/                 # prod.* trajectory

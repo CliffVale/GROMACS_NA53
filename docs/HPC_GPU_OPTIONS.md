@@ -40,7 +40,7 @@ given the project has funding?
 
 ---
 
-## 3. Comparison for THIS workload (55-nt ssDNA, ~35–45k atoms, 100–500 ns, parmbsc1+TIP3P)
+## 3. Comparison for THIS workload (75-nt ssDNA, ~45–65k atoms, 100–500 ns, parmbsc1+TIP3P)
 
 | Criterion | T3 GPU (iService) | TWAI T2 (commercial) | Local GTX 1650 Ti |
 |---|---|---|---|
@@ -52,7 +52,7 @@ given the project has funding?
 | Main risk | grant/rental delay | per-hour cost; operator differences | 4 GB VRAM caps system size; you're away from it |
 | Queue | Slurm (ct56-like waits) | Slurm | none |
 
-**Estimate basis:** 1BNA (26k atoms) ran 257 ns/day on a GTX 1650 Ti. NA53 at ~35–45k
+**Estimate basis:** 1BNA (26k atoms) ran 257 ns/day on a GTX 1650 Ti. NA53 (75-nt) at ~45–65k
 atoms is ~1.5× the work → ~170 ns/day on the same GPU; modern data-center GPUs add
 another 1–3× with full offload (`-nb gpu -pme gpu -bonded gpu -update gpu`). ⚠️
 Estimates — always run the 5,000-step benchmark (`bash scripts/benchmark.sh`) on the

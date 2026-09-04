@@ -3,7 +3,7 @@
 
 | Project at a glance | |
 |---|---|
-| **The science** | Predict how the **NA53 aptamer** (55-nt DNA) folds in 3D, so it can be used in a biosensor for **NGAL** (a kidney-injury biomarker) |
+| **The science** | Predict how the **NA53 aptamer** (75-nt DNA) folds in 3D, so it can be used in a biosensor for **NGAL** (a kidney-injury biomarker) |
 | **The method** | Molecular dynamics (MD) simulation with **GROMACS** — build the system, equilibrate it, simulate ≥100 ns, analyze the folding |
 | **The hardware** | Workstation GPU for tests · **Taiwania 3** (NCHC supercomputer, Taiwan) for real runs |
 | **The guarantee** | Every parameter is verified and documented; automated checks (CI + `doctor`) catch mistakes before they waste compute |
@@ -58,7 +58,7 @@ sequence      →  3D .pdb     →  water box +     →  stable      →  long m
 
 Each stage is a **file gate**: it refuses to run without its required input, and
 fails loudly instead of silently producing garbage. Rough time budgets for a
-55-nt system: predict ~1 h (mostly human) · prep ~5 min · equil ~2 h · prod
+75-nt system: predict ~1 h (mostly human) · prep ~5 min · equil ~2 h · prod
 **~40–70 ns/day** on Taiwania 3 CPU (100 ns fits the 4-day queue) · analysis ~1 h.
 
 ---

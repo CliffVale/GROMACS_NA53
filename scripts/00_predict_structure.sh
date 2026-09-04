@@ -182,7 +182,7 @@ else
         echo "  build one from sequence, and this script will NOT write a fake"
         echo "  partial PDB (that would fail pdb2gmx later)."
         echo ""
-        echo "  Get a real ssDNA model for NA53 (55 nt, DNA — NOT RNA):"
+        echo "  Get a real ssDNA model for NA53 (75 nt, DNA — NOT RNA):"
         echo ""
         echo "    Option A (CLI, free):  AptaFold"
         echo "      git clone https://github.com/virtualscreenlab/AptaFold \$HOME/NA53_tools/AptaFold"

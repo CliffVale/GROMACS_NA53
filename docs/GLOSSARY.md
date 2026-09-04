@@ -12,7 +12,7 @@
 
 **Aptamer** — A short piece of single-stranded DNA or RNA (usually 20–100
 nucleotides) that folds into a specific 3D shape and binds one target molecule
-selectively. Ours is **NA53** (55-nt DNA) targeting **NGAL**. *Why it matters:
+selectively. Ours is **NA53** (75-nt DNA) targeting **NGAL**. *Why it matters:
 the whole project exists to predict NA53's folded shape for a biosensor.*
 
 **All-atom** — A simulation in which every single atom (including every

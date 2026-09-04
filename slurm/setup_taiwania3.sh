@@ -87,7 +87,13 @@ else
     echo "  Creating environment from environment.yml (may take 5-15 min)..."
     conda env create -f environment.yml 2>&1 | tail -5
 fi
+# INCIDENT 2026-09-04 (3): conda-forge gromacs ships an activation hook that
+# sources GMXRC.bash, which reads unset vars (GMXLDLIB etc.). Under `set -u`
+# that aborts `conda activate` and kills the script right after a successful
+# env create. Relax -u around activation only (e/o still active).
+set +u
 conda activate "$CONDA_ENV"
+set -u
 
 # ─── Step 4: Validate + prepare directories ───────────────
 echo ""

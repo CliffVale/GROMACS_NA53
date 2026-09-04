@@ -77,10 +77,14 @@ echo "▶ Step 3: Creating conda environment ($CONDA_ENV)..."
 
 if conda env list | grep -q "^${CONDA_ENV} "; then
     echo "  ✓ Environment '$CONDA_ENV' already exists"
+    set +u
     conda activate "$CONDA_ENV"
+    set -u
 else
     conda create -n "$CONDA_ENV" python=3.10 -y
+    set +u
     conda activate "$CONDA_ENV"
+    set -u
     echo "  ✓ Environment created"
 fi
 

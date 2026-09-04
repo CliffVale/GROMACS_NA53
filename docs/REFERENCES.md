@@ -105,7 +105,23 @@ Status tags:
 | `[S]` SLURM tooling | sbatch/squeue/scontrol/sacctmgr/sinfo (Taiwania 3) | submit + monitor |
 | `[S]` GitHub Actions (ubuntu-latest, actions/checkout@v4) | https://github.com/features/actions | CI validation |
 
-## 7. Provenance records (internal — this repo's own lineage)
+## 7. Additions 2026-09-04 — aptamer/GROMACS bibliography analysis
+
+Opened & extracted into `research/reports/2026-09-04-aptamer-bibliography-analysis.md`
+(full ledger section in `research/REFERENCES.md`):
+
+| Source | URL | Used for |
+|---|---|---|
+| `[L]` Ochoa & Milam 2025, AF3 for DNA/RNA aptamers, *ACS Synth Biol* 14(8):3049, DOI 10.1021/acssynbio.5c00196 | https://pmc.ncbi.nlm.nih.gov/articles/PMC12362623/ | Phase-5 structure-prediction option (AF3); PDB aptamer-scarcity data |
+| `[L]` Ropii et al. 2024 (cTnI ssDNA aptamers, *PLoS ONE* 19:e0302475) | https://doi.org/10.1371/journal.pone.0302475 | ssDNA modeling protocol (mFold→RNA-surrogate→relax→dock) |
+| `[L]` Dans et al. 2017 (B-DNA FF accuracy, *NAR* 45:4217, gkw1355) | https://pmc.ncbi.nlm.nih.gov/articles/PMC5397185/ | **evidence for R2**: only bsc1/bsc0OL15 reliable multi-µs → current parm99-era DNA FF is the weak tier |
+| `[L]` Bian et al. 2018 (TBA GQ folding MSM, *Biophys J* 114:1529) | https://pmc.ncbi.nlm.nih.gov/articles/PMC5954565/ | folding-sampling infeasibility evidence (validates folded-input design) |
+| `[L]` Ropii et al. 2023 (RNA aptamer 3D + MD, *PLoS ONE* 18:e0288684) | https://doi.org/10.1371/journal.pone.0288684 | RNAComposer ~1.7 Å; MD-refines-models; clustering guidance |
+| `[L]` GROMACS 2026.3 manual, mdrun performance | https://manual.gromacs.org/current/user-guide/mdrun-performance.html | perf metrics + tuning levers (R5/R6) |
+
+---
+
+## 8. Provenance records (internal — this repo's own lineage)
 
 | Record | Where | Note |
 |---|---|---|

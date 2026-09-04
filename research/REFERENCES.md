@@ -52,3 +52,14 @@ Format:
 - [Crossref API] DOI 10.1186/s12967-019-1955-7 record (J Transl Med 17:204, 2019-06-18) — https://api.crossref.org/works/10.1186/s12967-019-1955-7 — (metadata verification; corrected the -0 guess from truncated ESM URL)
 - [Semantic Scholar API] Citation graph of Hong 2019 DOI — retrieved 2026-09-03 (metadata only) — (no published NA53 MD found; downstream works are biosensor papers)
 - ⚠️ screened only (metadata/snippet, not read in full): Sengar 2021 oxDNA Primer Front Mol Biosci 8:693710; RCSB PDB entries 1NGL/1L6M/1X71/3FW4
+
+## 2026-09-04 · aptamer-bibliography-analysis (67-ref protocol bibliography)
+**Opened & read (full/abstract content extracted into the report):**
+- Ochoa S, Milam VT 2025, Direct Modeling of DNA and RNA Aptamers with AlphaFold 3, ACS Synth Biol 14(8):3049–3064, DOI 10.1021/acssynbio.5c00196 — https://pmc.ncbi.nlm.nih.gov/articles/PMC12362623/ — (AF3 for aptamer 3D: GQ/pseudoknot OK; PDB aptamer scarcity 117 DNA/232 RNA; training-bias limits)
+- Ropii B et al. 2024, Molecular interaction of six ssDNA aptamers to cardiac troponin I (docking + MD), PLoS ONE 19(5):e0302475 — https://doi.org/10.1371/journal.pone.0302475 — (mFold→RNAComposer T→U surrogate→relax 100 ns→dock; electrostatics-driven binding)
+- Dans PD et al. 2017, How accurate are accurate force-fields for B-DNA?, Nucleic Acids Res 45(7):4217–4230, DOI 10.1093/nar/gkw1355 — https://pmc.ncbi.nlm.nih.gov/articles/PMC5397185/ — (only bsc1/bsc0OL15 predictive multi-µs; parm99-era DNA unreliable → evidence for FF switch R2)
+- Bian Y et al. 2018, Fast-folding pathways of the TBA G-quadruplex via MSM, Biophys J 114(7):1529–1538, DOI 10.1016/j.bpj.2018.02.021 — https://pmc.ncbi.nlm.nih.gov/articles/PMC5954565/ — (cMD cannot fold even 15-nt aptamer; advanced sampling + MSM needed → validates folded-input design)
+- Ropii B et al. 2023, Assessment of MD results of 3D RNA aptamer structure prediction, PLoS ONE 18(7):e0288684 — https://doi.org/10.1371/journal.pone.0288684 — (RNAComposer ~1.7 Å; CHARMM36/TIP3P/1.2 nm/100 ns protocol; MD forms noncanonical loop H-bonds; cluster to pick representative)
+- GROMACS manual 2026.3, Getting good performance from mdrun — https://manual.gromacs.org/current/user-guide/mdrun-performance.html — (metrics incl. Matom·steps/s; AVX2>AVX512 on GPU runs; 4 fs mass-repartition; GPU-resident nstcalcenergy/nstlist tuning)
+**Screened only (title/venue metadata — no content claims):** the remaining 61 entries of the protocol bibliography (catalogued by domain tier in the report).
+**Blocked (attempted, not opened):** ACS pages (#1/#13/#24/#26/#32/#50), PubMed #4 (cookie wall), bioRxiv #25 (403) — do not cite as read.

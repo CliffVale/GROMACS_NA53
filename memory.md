@@ -52,6 +52,7 @@
 | 2026-09-04 | **Health reporting unified into status/monitor** — `scripts/health_report.sh` (H1 engine · H2 integrity summary · H3 live gmx probes · H4 run KPIs: stage, sim time ps from deffnm `.log`, ns/day measured or live-estimated, >600 s stale-log ⚠️) and shared `scripts/probe_gmx_compat.sh` (doctor + health call the same probes). `status`/`monitor` print the health block locally and over SSH → cluster jobs report health in the same ✅/⚠️/❌ vocabulary as doctor. KPI doc §8 documents the table→implementation map | docs/06_KPI_DASHBOARD.md §8, scripts/health_report.sh, scripts/probe_gmx_compat.sh |
 | 2026-09-04 | **Master source register** — `docs/REFERENCES.md`: every external source used across the whole workflow (NA53 primary lit, aptamer in-silico methodology, FF/method papers, structure DBs & 3D tools, cluster/infra decision chain, software used, provenance records), each with URL + verification tag ([L]/[W]/[D]/[B]/[S]/[P]). Web-verified the two weak README rows → **corrections C1/C2 applied to README**: bsc1 was mis-attributed to Zgarbová 2011 (that is bsc0; bsc1 = Ivani 2016 Nat Methods 13:55) and CHAPERONg is CSBJ 2023 (DOI 10.1016/j.csbj.2023.09.024), not GigaScience. research/REFERENCES.md header now points to the master | docs/REFERENCES.md, README §References, research/REFERENCES.md |
 | 2026-09-04 | **67-ref bibliography analysis** (research/reports/2026-09-04-aptamer-bibliography-analysis.md): opened 6 key sources — AF3-for-aptamers (Ochoa & Milam 2025; PDB has only 117 DNA aptamer structures → AF3 viable for Phase 5 incl. GQ/pseudoknot, low confidence non-PDB), cTnI ssDNA docking protocol (mFold→RNA-surrogate→100 ns relax→dock; picomolar Kd aptamers), **Dans 2017 B-DNA FF accuracy (only bsc1/bsc0OL15 predictive multi-µs → evidence for R2: switch DNA FF from parm99-era amber99sb-ildn to parmbsc1/OL15 via gmxOL15/intbio ports)**, TBA GQ folding MSM (Bian 2018; cMD can't fold even 15-nt → validates folded-input design), RNA-aptamer 3D+MD (RNAComposer ~1.7 Å; MD refines models), GROMACS mdrun-perf manual (Matom·steps/s metric; GPU-resident tuning). 61 screened-only, labeled. Run logged in research/deepsearch.log; ledger + master register synced | research/reports/2026-09-04-aptamer-bibliography-analysis.md |
+| 2026-09-04 | **Beginner-friendly documentation pass** — new `docs/BEGINNER_GUIDE.md` (zero-knowledge walkthrough: science primer, repo map, stage-by-stage pipeline, 3 ways to run, results sanity checklist, troubleshooting) and `docs/GLOSSARY.md` (plain-language dictionary of every term). README rewritten beginner-first (plain intro, reading paths, annotated structure, one-glance pipeline) and its parameter table **corrected to the running truth**: FF row now states `amber99sb-ildn` + TIP3P (not AMBER99bsc1) with parmbsc1 flagged under evaluation; cutoffs **1.0 → 0.8 nm**; thermostat V-rescale (not Nosé–Hoover) — matching the ✅ configs and docs/INCIDENT_ANALYSIS class P | docs/BEGINNER_GUIDE.md, docs/GLOSSARY.md, README.md |
 
 ## 3. Files — Current Ownership & Status
 
@@ -116,9 +117,8 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | `docs/HPC_GPU_OPTIONS.md` | ✅ | platform evidence + §5 on-node checklist |
 
 ### 3.7 Currently being worked on
-- **Session complete.** Clone-and-run test in
-  `../NA53_1ns_trial_from scratch/` (sibling dir, outside repo) passed after
-  the two packaging fixes; nothing mid-edit in the repo.
+- **Session complete.** Beginner documentation pass finished (README +
+  BEGINNER_GUIDE + GLOSSARY); nothing mid-edit in the repo.
 - Next: Phase 4 (cluster setup run) and Phase 5 (real NA53 PDB).
 
 ---
@@ -215,6 +215,7 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | Q4 | INF/DSSR analysis worth installing for publication? | user | Phase 9 |
 | Q5 | Cluster rep structures → docking (AutoDock/HADDOCK)? | user | Phase 10 |
 | Q6 | Will NCHC grant/rent GPU to mst115368 on T3 (gpu-amd A100)? | user | Phase 3/4 |
+| Q7 | Switch DNA FF amber99sb-ildn → parmbsc1/OL15 (bibliography R2: Dans 2017)? Needs a pdb2gmx validation run + re-doctor before real prod | agent | Phase 6 |
 
 ---
 

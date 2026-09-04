@@ -422,7 +422,13 @@ cmd_monitor() {
             [ -n "$f" ] && tail -n 20 "$f" || echo "(no md log yet — run ./run_simulation.sh start)"
             return
         fi
-        # live dashboard: Textual TUI when available, bash fallback otherwise
+        # live dashboard: Textual TUI when available, bash fallback otherwise.
+        # Try the profile's ENV_SETUP (conda env) first if the bare python3
+        # lacks textual — being in (base) should not cost you the TUI.
+        if ! python3 -c 'import textual' >/dev/null 2>&1; then
+            setup_env 2>/dev/null || true
+            hash -r 2>/dev/null || true
+        fi
         if python3 -c 'import textual' >/dev/null 2>&1; then
             python3 scripts/dashboard_textual.py --profile "$PROFILE_NAME_CUR" \
                 --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"

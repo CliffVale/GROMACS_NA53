@@ -30,3 +30,7 @@ dependencies:
   - tqdm
   - pip:
     - seqfold
+    # Optional but recommended for ./run_simulation.sh monitor: the Textual
+    # live dashboard (scripts/dashboard_textual.py). monitor auto-falls back
+    # to the pure-bash dashboard when textual is not installed.
+    - textual>=0.50

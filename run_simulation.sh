@@ -408,8 +408,10 @@ cmd_monitor() {
         else
             # one SSH session runs the polling dashboard ON the cluster — the
             # loop re-reads files + squeue locally, no per-poll 2FA prompts.
+            # Textual TUI preferred; falls back to the bash dashboard.
+            local envh="source \$HOME/miniconda3/etc/profile.d/conda.sh 2>/dev/null || source \$HOME/anaconda3/etc/profile.d/conda.sh 2>/dev/null || true"
             # shellcheck disable=SC2029
-            ssh -t "$dest" "${rcd}; bash scripts/live_dashboard.sh --profile $PROFILE_NAME_CUR --target-ns ${PROD_NS:-100} --every ${MONITOR_EVERY:-30}"
+            ssh -t "$dest" "${rcd}; ${envh}; conda activate na53_aptamer 2>/dev/null || true; python3 scripts/dashboard_textual.py --profile $PROFILE_NAME_CUR --target-ns ${PROD_NS:-100} --every ${MONITOR_EVERY:-30} 2>/dev/null || bash scripts/live_dashboard.sh --profile $PROFILE_NAME_CUR --target-ns ${PROD_NS:-100} --every ${MONITOR_EVERY:-30}"
         fi
     else
         echo "Monitoring local run — Ctrl-C to stop."
@@ -420,9 +422,14 @@ cmd_monitor() {
             [ -n "$f" ] && tail -n 20 "$f" || echo "(no md log yet — run ./run_simulation.sh start)"
             return
         fi
-        # live dashboard: polls (default 30 s, override with MONITOR_EVERY)
-        bash scripts/live_dashboard.sh --profile "$PROFILE_NAME_CUR" \
-            --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
+        # live dashboard: Textual TUI when available, bash fallback otherwise
+        if python3 -c 'import textual' >/dev/null 2>&1; then
+            python3 scripts/dashboard_textual.py --profile "$PROFILE_NAME_CUR" \
+                --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
+        else
+            bash scripts/live_dashboard.sh --profile "$PROFILE_NAME_CUR" \
+                --target-ns "${PROD_NS:-100}" --every "${MONITOR_EVERY:-30}"
+        fi
     fi
 }
 

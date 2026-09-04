@@ -104,13 +104,20 @@ parse_log() { # $1=stage $2=log → sets: total_steps total_ps cur_step cur_ps t
         fin_step=$(echo "$line" | awk '{print $2}' | tr -d ',')
         fin_eta=$(echo "$line" | sed -E 's/^step [0-9]+, will finish //')
     fi
-    # last energy table row: Step Time [Lambda] Temp Pres
-    read -r cur_step cur_ps temp pres <<< "$(awk '
+    # step/time — same tolerant extraction health_report.sh H4 uses (proven on
+    # T3 2024.4): any "Step Time" header, last numeric row wins. Split from the
+    # Temp/Pres pass so a row layout quirk in one column never hides progress.
+    read -r cur_step cur_ps <<< "$(awk '
         /^ *Step +Time/ { want=1; next }
-        want && NF >= 5 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ && $4 ~ /^[-0-9.]+$/ {
-            st=$1; t=$2; tp=$4; pr=$5
-        }
-        END { if (st != "") print st, t, tp, pr }
+        want && NF >= 2 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ { st=$1; t=$2 }
+        END { if (st != "") print st, t }
+    ' "$log")"
+    # temp/pres — best-effort, cols 4/5 of the same table when present
+    read -r temp pres <<< "$(awk '
+        /^ *Step +Time/ { want=1; next }
+        want && NF >= 5 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9.]+$/ \
+             && $4 ~ /^[-0-9.]+$/ && $5 ~ /^[-0-9.]+$/ { tp=$4; pr=$5 }
+        END { if (tp != "") print tp, pr }
     ' "$log")"
 }
 

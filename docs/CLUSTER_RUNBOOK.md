@@ -21,8 +21,9 @@ and hydrogens, resolves altLoc duplicates, merges stray chains, renumbers
 residues 1..75, re-validates the CLEANED result, and only then writes
 `structures/NA53_initial.pdb`. A rejected model leaves **no file behind**.
 AlphaFold 3 emits **mmCIF (.cif)** — `--stage` reads .cif and .pdb natively
-and normalizes AF3's nonstandard 5'-triphosphate to the amber `DA5`
-monophosphate terminus (drops the gamma OP3 atom, reported in the output).
+and normalizes AF3's nonstandard 5'-triphosphate to the amber `DA5` 5'-OH
+terminus (drops the gamma OP3 plus the rest of the 5'-phosphate, and renames
+OP1/OP2 → O1P/O2P to GROMACS amber99sb-ildn spelling — reported in the output).
 
 ```bash
 cd GROMACS_NA53

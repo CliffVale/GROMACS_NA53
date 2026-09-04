@@ -293,10 +293,10 @@ cmd_submit() {
 
     if [ "$dry" = "1" ]; then
         echo ""
-        echo "── dry-run: would submit (with afterok dependencies) ──"
+        echo "── dry-run: would submit (with afterok dependencies, from slurm/) ──"
         local prev=""
         for base in "${STAGES_SBATCH[@]}"; do
-            echo "  sbatch --parsable${prev:+ --dependency=afterok:$prev} $JOBS_DIR/${base}_${prof}.sbatch"
+            echo "  sbatch --parsable${prev:+ --dependency=afterok:$prev} jobs/${base}_${prof}.sbatch"
             prev="<jobid>"
         done
         echo "✅ dry-run done — nothing submitted."
@@ -304,18 +304,25 @@ cmd_submit() {
     fi
 
     log_status "submit profile=$prof partition=$PARTITION gres='${GRES:-none}' ns=${ns:-$PROD_NS}"
+    # Submit FROM slurm/ (so SLURM_SUBMIT_DIR=slurm): the sbatch templates resolve
+    # `--output=../logs/` and `cd ${SLURM_SUBMIT_DIR}/../scripts` against the
+    # submission cwd. INCIDENT 2026-09-04: submitting from the repo root sent job
+    # logs to ~/logs/ (the repo's parent) and could cd jobs into ~/scripts.
     local prev="" jid
-    for base in "${STAGES_SBATCH[@]}"; do
-        local job="$JOBS_DIR/${base}_${prof}.sbatch"
-        if [ -n "$prev" ]; then
-            jid=$(sbatch --parsable --dependency=afterok:"$prev" "$job")
-        else
-            jid=$(sbatch --parsable "$job")
-        fi
-        echo "✔ ${base}: job $jid"
-        log_status "job ${base} id=$jid"
-        prev="$jid"
-    done
+    (
+        cd slurm
+        for base in "${STAGES_SBATCH[@]}"; do
+            local job="jobs/${base}_${prof}.sbatch"
+            if [ -n "$prev" ]; then
+                jid=$(sbatch --parsable --dependency=afterok:"$prev" "$job")
+            else
+                jid=$(sbatch --parsable "$job")
+            fi
+            echo "✔ ${base}: job $jid"
+            log_status "job ${base} id=$jid"
+            prev="$jid"
+        done
+    )
     echo ""
     echo "Chain submitted. Watch:  ./run_simulation.sh monitor --profile $prof"
 }

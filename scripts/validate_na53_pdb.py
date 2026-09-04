@@ -49,7 +49,7 @@ BASE_HEAVY = {
  "A": {"N9","C8","N7","C5","C6","N1","C2","N3","C4","N6"},
  "C": {"N1","C2","O2","N3","C4","N4","C5","C6"},
  "G": {"N9","C8","N7","C5","C6","O6","N1","C2","N2","N3","C4"},
- "T": {"N1","C2","O2","N3","C4","O4","C5","C5M","C6"},
+ "T": {"N1","C2","O2","N3","C4","O4","C5","C7","C6"},   # C7 = thymine methyl in GROMACS amber99sb-ildn
 }
 CANON = {"A": "DA", "T": "DT", "C": "DC", "G": "DG"}
 
@@ -191,11 +191,13 @@ def cif_atom_lines(path):
         occ = f[ci["occupancy"]] if "occupancy" in ci else "1.00"
         b = f[ci["B_iso_or_equiv"]] if "B_iso_or_equiv" in ci else "0.00"
         el = f[ci["type_symbol"]] if "type_symbol" in ci else name[:1]
-        # AF3 puts a 5'-triphosphate (OP3 P OP1 OP2) on residue 1 — amber DNA
-        # force fields (DA5) only support a monophosphate. Drop the single gamma
-        # oxygen OP3 and report it; OP1/OP2/P stay as the standard DA5 phosphate.
+        # AF3 puts a 5'-triphosphate (OP3 P OP1 OP2) on residue 1. GROMACS
+        # amber99sb-ildn DA5 is a plain 5'-OH terminus (NO phosphate atoms at
+        # all) and names phosphate oxygens O1P/O2P — the full 5'-phosphate and
+        # the OP1/OP2 spelling are handled in _emit_staged. Here we only drop
+        # the gamma oxygen OP3, which exists in no DNA force field.
         if name == "OP3":
-            notes.append("dropped OP3 (AF3 5'-triphosphate -> amber 5'-monophosphate, DA5 terminus)")
+            notes.append("dropped OP3 (AF3 5'-triphosphate — gamma phosphate has no ff equivalent)")
             continue
         # PDB columns: name left-just 4 in 13-16; resn right-just 3 in 18-20;
         # chain col 22; resSeq right-just 4 in 23-26; x/y/z 8.3 in 31-54;
@@ -272,6 +274,29 @@ def _emit_staged(raw_path, out_path):
     dropped["altloc"] = len(keep) - len(best)
     keep = sorted(best.values(), key=lambda r: (r[2], r[3], r[1]))
     n_alt = dropped["altloc"]
+
+    # GROMACS amber99sb-ildn conventions (INCIDENT 2026-09-04-6 — the first
+    # real-AF3 pdb2gmx run died with a 0-byte topol.top):
+    #   (a) the 5' terminus residue DA5 is a 5'-OH — it has NO phosphate.
+    #       The AF3 5'-triphosphate is therefore removed entirely (P, OP1,
+    #       OP2; OP3 was already dropped), turning residue 1 into DA5;
+    #   (b) phosphate oxygens are named O1P/O2P in this ff, not AF3's OP1/OP2.
+    rename = {"OP1": "O1P", "OP2": "O2P"}
+    phos5 = {"P", "OP1", "OP2", "O1P", "O2P"}
+    first_resi = min(r[3] for r in keep)
+    n_before = len(keep)
+    norm_keep = []
+    for r in keep:
+        if r[3] == first_resi and r[1] in phos5:
+            continue
+        r[1] = rename.get(r[1], r[1])
+        norm_keep.append(r)
+    keep = norm_keep
+    n_dropped = n_before - len(keep)
+    if n_dropped:
+        report.append(f"ℹ  dropped 5'-terminal phosphate ({n_dropped} atoms: P/OP1/OP2) — amber99sb-ildn DA5 is a 5'-OH terminus")
+    if any(r[1] in ("O1P", "O2P") for r in keep):
+        report.append("ℹ  phosphate oxygens renamed to GROMACS amber99sb-ildn spelling (OP1/OP2 -> O1P/O2P)")
 
     # emit cleaned PDB with contiguous 1..N numbering, single chain A.
     # (residue counter advances ONLY when the source residue changes — a
@@ -354,11 +379,14 @@ def assess(path, fasta):
         letter = next(v[0] for k, v in d.items() if not k.startswith("__"))
         seq.append(letter)
         heavy = [a for a in d if not a.startswith("__") and not a.startswith("H")]
+        is_5p = (r == rlist[0])   # 5'-OH terminus (DA5) legitimately has no phosphate
         for atom in BACKBONE + SUGAR:
+            if atom == "P" and is_5p:
+                continue
             if atom not in d:
                 missing_bb += 1
                 bad.append((r, letter, f"missing backbone/sugar atom {atom}"))
-        if not any(p in d for p in PHOS_O):
+        if not is_5p and not any(p in d for p in PHOS_O):
             bad.append((r, letter, "no phosphate oxygen (OP1/OP2/O1P/O2P)"))
         if letter in BASE_HEAVY and len(BASE_HEAVY[letter] - set(heavy)) > 2:
             bad.append((r, letter, "base heavy atoms missing"))

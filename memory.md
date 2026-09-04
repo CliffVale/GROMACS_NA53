@@ -19,9 +19,18 @@
 - ✅ **2026-09-04: local 1 ns end-to-end trial PASSED** through the launcher
   (`local_gpu` profile, GTX 1650 Ti, substitute 1BNA PDB): prep → EM → NVT →
   NPT → 1 ns prod (~5 min) → all 8 analyses → 8 figures. Zero warnings.
-- 🔵 Phase 4 (Taiwania 3 setup) scripted + mostly verified live; env install
-  still needs one run on the cluster.
+- ✅ **Phase 4 COMPLETE (2026-09-04, live on T3)**: `na53_aptamer` conda env
+  **created on Taiwania 3** (GROMACS 2024.4 conda_forge) after fixing two live
+  blockers — viennarna is bioconda-only (removed, `fa1f52e`) and the gromacs
+  conda activation hook aborts under `set -u` (guarded, `f0c8340`).
+  `doctor` → **ALL PASS** on the cluster.
 - ✅ **Phase 5 COMPLETE (2026-09-04)**: real 75-nt NA53 structure staged from **AlphaFold 3 model_0** (job 2026-09-04_19:14) via `validate_na53_pdb.py --stage` (new mmCIF support + 5'-triphosphate→monophosphate normalization). Provenance (raw model CIF + confidences + job request + pTM caveat) in `structures/raw_af3/PROVENANCE.md`. pTM 0.19 is expected-low for unbound ssDNA — not a defect signal (has_clash 0, disordered 0).
+- 🔵 **Phase 6 (T3 cluster run) IN PROGRESS**: 1 ns smoke chain submitted
+  (jobs 2031187–90, afterok deps, 19:54) — **prep 2031187 FAILED ~2 min in**
+  (0-byte `topol.top` = pdb2gmx died). Diagnosis pending: job logs landed in
+  `~/logs/` (outside the repo) because the launcher submits from the repo root
+  while templates assume `cd slurm`. Resume: `cat ~/logs/na53_prep_2031187.out/.err`
+  → fix → resubmit smoke.
 - 🟦 **2026-09-04 correction: NA53 is 75 nt, not 55 nt** — the pasted sequence and the Hong-2019 primary-source transcription (lit-review C2) both give 75 nt (20 fixed + 35 random + 20 fixed); the '55-nt' figure was a miscount that had propagated through README/PRD/GLOSSARY/BEGINNER_GUIDE/HPC docs. All corrected; canonical seq in `structures/NA53.fasta`; `validate_na53_pdb.py` enforces it (rejects the 55-nt impostor).
 
 ---

@@ -26,6 +26,12 @@ ions.itp
 em.*
 nvt.*
 npt*.*
+# ...but the MDP stage configs ARE tracked (the globs above are meant for
+# grompp/mdrun output files like em.gro / nvt.tpr / npt2.edr, NOT the inputs)
+!em.mdp
+!nvt.mdp
+!npt.mdp
+!npt_free.mdp
 
 # Conda environment
 .conda/

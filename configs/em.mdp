@@ -1,0 +1,49 @@
+; ============================================================
+; ENERGY MINIMIZATION MDP — GROMACS_NA53
+; ============================================================
+; Steepest descent energy minimization
+; Target: Reduce force to < 1000 kJ/mol/nm
+; ============================================================
+
+; ============================================================
+; ENERGY MINIMIZATION MDP — GROMACS_NA53
+; VALIDATED: From GROMACS_TEEP Trials 01-08
+; ============================================================
+; Steepest descent energy minimization
+; Target: Reduce force to < 1000 kJ/mol/nm
+; ============================================================
+
+; Run control
+integrator      = steep
+emtol           = 1000.0        ; Stop when max force < 1000 kJ/mol/nm
+emstep          = 0.01          ; Energy step size (nm)
+nsteps          = 50000         ; Max steps (100 ps equivalent)
+
+; Neighbor searching
+cutoff-scheme   = Verlet
+ns_type         = grid
+nstlist         = 1
+rcoulomb        = 0.8           ; ✅ VALIDATED: 0.8 nm for AMBER99SB
+rvdw            = 0.8           ; ✅ VALIDATED: 0.8 nm for AMBER99SB
+
+; Electrostatics
+coulombtype     = PME
+pme_order       = 4
+fourierspacing  = 0.12
+
+; Van der Waals
+vdwtype         = Cut-off
+vdw-modifier    = Potential-shift-Verlet  ; ✅ REQUIRED for AMBER
+DispCorr        = EnerPres     ; ✅ REQUIRED: Dispersion correction
+
+; PBC
+pbc             = xyz
+
+; No constraints for EM
+constraints     = none
+
+; Output
+nstxout         = 1000
+nstvout         = 1000
+nstenergy       = 1000
+nstlog          = 1000

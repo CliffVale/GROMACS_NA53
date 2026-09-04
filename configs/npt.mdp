@@ -1,0 +1,68 @@
+; ============================================================
+; NPT EQUILIBRATION MDP (Restrained) — GROMACS_NA53
+; ============================================================
+; Pressure + temperature equilibration with backbone restraints
+; Duration: 100 ps (50,000 steps × 2 fs)
+; Thermostat: Nosé-Hoover at 310.15 K
+; Barostat: Parrinello-Rahman at 1.0 bar
+; Restraints: Heavy atoms via pdb2gmx posre (1000 kJ/mol/nm²) — macro POSRES
+;            (POSRES_BB would need a custom backbone-only restraint file)
+; ============================================================
+
+; Run control
+integrator      = md
+nsteps          = 50000         ; 100 ps
+dt              = 0.002
+
+; Bond constraints
+continuation    = yes
+constraint_algorithm = lincs
+constraints     = h-bonds
+lincs_iter      = 1
+lincs_order     = 4
+
+; Neighbor searching
+cutoff-scheme   = Verlet
+ns_type         = grid
+nstlist         = 10
+rcoulomb        = 0.8           ; ✅ VALIDATED: 0.8 nm (200 ns 1BNA run)
+rvdw            = 0.8           ; ✅ VALIDATED: 0.8 nm
+vdw-modifier    = Potential-shift-Verlet  ; ✅ REQUIRED for AMBER
+
+; Electrostatics
+coulombtype     = PME
+pme_order       = 4
+fourierspacing  = 0.12
+
+; Van der Waals
+vdwtype         = Cut-off
+DispCorr        = EnerPres     ; ✅ REQUIRED: Dispersion correction
+
+; Temperature coupling — VALIDATED from GROMACS_TEEP
+tcoupl          = V-rescale     ; ✅ VALIDATED: V-rescale
+tc-grps         = DNA Water_and_ions  ; ✅ VALIDATED: Separate groups
+tau-t           = 0.1 0.1       ; ✅ VALIDATED: 0.1 ps coupling
+ref-t           = 310.15 310.15 ; ✅ Physiological temperature
+
+; Pressure coupling — VALIDATED from GROMACS_TEEP
+pcoupl          = parrinello-rahman  ; ✅ VALIDATED
+pcoupltype      = isotropic
+tau-p           = 2.0            ; ✅ VALIDATED: 2.0 ps (not 5.0)
+ref-p           = 1.0
+compressibility = 4.5e-5
+refcoord_scaling = com          ; REQUIRED: posres + P-coupling → scale ref coords
+
+; PBC
+pbc             = xyz
+
+; Position restraints (pdb2gmx posre, #ifdef POSRES)
+define          = -DPOSRES
+
+; Output
+nstxout-compressed = 1000
+nstenergy       = 1000
+nstlog          = 1000
+nstcalcenergy   = 1000
+
+; No velocity generation (continuation)
+gen_vel         = no

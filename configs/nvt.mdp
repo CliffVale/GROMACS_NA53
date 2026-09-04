@@ -1,0 +1,63 @@
+; ============================================================
+; NVT EQUILIBRATION MDP — GROMACS_NA53
+; ============================================================
+; Temperature equilibration with positional restraints
+; Duration: 100 ps (50,000 steps × 2 fs)
+; Thermostat: Nosé-Hoover at 310.15 K
+; Restraints: Heavy atoms (1000 kJ/mol/nm²)
+; ============================================================
+
+; Run control
+integrator      = md
+nsteps          = 50000         ; 100 ps
+dt              = 0.002
+
+; Bond constraints
+continuation    = no
+constraint_algorithm = lincs
+constraints     = h-bonds
+lincs_iter      = 1
+lincs_order     = 4
+
+; Neighbor searching
+cutoff-scheme   = Verlet
+ns_type         = grid
+nstlist         = 10
+rcoulomb        = 0.8           ; ✅ VALIDATED: 0.8 nm (200 ns 1BNA run)
+rvdw            = 0.8           ; ✅ VALIDATED: 0.8 nm
+vdw-modifier    = Potential-shift-Verlet  ; ✅ REQUIRED for AMBER
+
+; Electrostatics
+coulombtype     = PME
+pme_order       = 4
+fourierspacing  = 0.12
+
+; Van der Waals
+vdwtype         = Cut-off
+DispCorr        = EnerPres     ; ✅ REQUIRED: Dispersion correction
+
+; Temperature coupling — VALIDATED from GROMACS_TEEP
+tcoupl          = V-rescale     ; ✅ VALIDATED: V-rescale (better than nose-hoover)
+tc-grps         = DNA Water_and_ions  ; ✅ VALIDATED: Separate coupling groups
+tau-t           = 0.1 0.1       ; ✅ VALIDATED: 0.1 ps coupling time
+ref-t           = 310.15 310.15 ; ✅ Physiological temperature
+
+; Pressure coupling (OFF for NVT)
+pcoupl          = no
+
+; PBC
+pbc             = xyz
+
+; Position restraints on heavy atoms
+define          = -DPOSRES
+
+; Output
+nstxout-compressed = 1000
+nstenergy       = 1000
+nstlog          = 1000
+nstcalcenergy   = 1000
+
+; Velocity generation
+gen_vel         = yes
+gen_temp        = 310.15
+gen_seed        = -1

@@ -1,0 +1,65 @@
+; ============================================================
+; NPT EQUILIBRATION MDP (Unrestrained) — GROMACS_NA53
+; ============================================================
+; Final equilibration without any restraints
+; Duration: 500 ps (250,000 steps × 2 fs)
+; Thermostat: Nosé-Hoover at 310.15 K
+; Barostat: Parrinello-Rahman at 1.0 bar
+; No restraints — system freely equilibrates
+; ============================================================
+
+; Run control
+integrator      = md
+nsteps          = 250000        ; 500 ps
+dt              = 0.002
+
+; Bond constraints
+continuation    = yes
+constraint_algorithm = lincs
+constraints     = h-bonds
+lincs_iter      = 1
+lincs_order     = 4
+
+; Neighbor searching
+cutoff-scheme   = Verlet
+ns_type         = grid
+nstlist         = 10
+rcoulomb        = 0.8           ; ✅ VALIDATED: 0.8 nm (200 ns 1BNA run)
+rvdw            = 0.8           ; ✅ VALIDATED: 0.8 nm
+vdw-modifier    = Potential-shift-Verlet  ; ✅ REQUIRED for AMBER
+
+; Electrostatics
+coulombtype     = PME
+pme_order       = 4
+fourierspacing  = 0.12
+
+; Van der Waals
+vdwtype         = Cut-off
+DispCorr        = EnerPres     ; ✅ REQUIRED: Dispersion correction
+
+; Temperature coupling — VALIDATED from GROMACS_TEEP
+tcoupl          = V-rescale     ; ✅ VALIDATED: V-rescale
+tc-grps         = DNA Water_and_ions  ; ✅ VALIDATED: Separate groups
+tau-t           = 0.1 0.1       ; ✅ VALIDATED: 0.1 ps coupling
+ref-t           = 310.15 310.15 ; ✅ Physiological temperature
+
+; Pressure coupling — VALIDATED from GROMACS_TEEP
+pcoupl          = parrinello-rahman  ; ✅ VALIDATED
+pcoupltype      = isotropic
+tau-p           = 2.0            ; ✅ VALIDATED: 2.0 ps
+ref-p           = 1.0
+compressibility = 4.5e-5
+
+; PBC
+pbc             = xyz
+
+; NO position restraints (define = )
+
+; Output
+nstxout-compressed = 500
+nstenergy       = 500
+nstlog          = 500
+nstcalcenergy   = 500
+
+; No velocity generation (continuation)
+gen_vel         = no

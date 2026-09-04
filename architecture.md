@@ -65,6 +65,7 @@ GROMACS_NA53/
 │   ├── 06_KPI_DASHBOARD.md
 │   ├── BEGINNER_GUIDE.md         # 🎓 zero-knowledge walkthrough (start here if new to MD)
 │   ├── CLUSTER_RUNBOOK.md        # 🚀 exact T3 commands: validate → doctor → smoke → prod
+│   ├── TAIWANIA3_ETIQUETTE.md   # 🚫 violations to avoid (suspension rules, etiquette)
 │   ├── GLOSSARY.md                # 📖 plain-language dictionary of every term
 │   ├── APTAMD_DEEP_ANALYSIS.md
 │   ├── LESSONS_LEARNED_FROM_TRIAL_RUNS.md

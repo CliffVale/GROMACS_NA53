@@ -91,6 +91,10 @@ Status tags:
 | `[W]` NCHC — TWCC 台灣AI雲 **service termination announcement (offline 2026-08-31)** | https://www.facebook.com/nchc.tw/posts/1356983769966414/ | TWCC is no longer an option (docs/HPC_GPU_OPTIONS.md) |
 | `[W]` NCHC iService — compute resource requests / Q&A (Taiwania 3, TWCC pricing) | https://iservice.nchc.org.tw/nchc_service/index.php · https://iservice.nchc.org.tw/nchc_service/nchc_service_qa.php?target=54 | GPU rental path on Taiwania 3 via iService |
 | `[W]` 台智雲 TWAI (Taiwania 2 commercial, V100) | https://www.twcloud.ai/en_us/products-and-services/gpu-hpc-service/ · https://docs.twcloud.ai/en/docs/user-guides/twcc/twnia2-hpc-cli/overview · https://docs.twcloud.ai/en/docs/user-guides/twcc/twnia2-hpc-cli/queues · https://docs.twcloud.ai/en/docs/user-guides/twcc/twnia2-hpc-cli/compute-resources | GPU fallback platform (V100 via Slurm) |
+| `[W]` Taiwania 3 official user manual (使用說明) | https://man.twcc.ai/@twnia3/rJM5qk3Aw (opened 2026-09-04) | prohibited uses (crypto/weapons/cyber → suspension); filesystem layout; queue policy history | docs/TAIWANIA3_ETIQUETTE.md §3 |
+| `[W]` Taiwania 3 official FAQ | https://iservice.nchc.org.tw/nchc_service/nchc_service_qa.php?target=118 (opened 2026-09-04) | allocation etiquette: no --mem = whole-node memory; core scatter; job reason codes; requeue/PREEMPTED; sharing | docs/TAIWANIA3_ETIQUETTE.md §5 |
+| `[W]` 如何連線到國網中心 (acyang, HackMD) | https://hackmd.io/@acyang/rJTFDZpB0 | 2FA-bypass prohibition (snippet-verified) | docs/TAIWANIA3_ETIQUETTE.md §3 |
+| `[W]` NCHC system/general FAQ | https://iservice.nchc.org.tw/nchc_service/nchc_service_qa.php?target=129 | /tmp periodic cleanup on login/transfer nodes (snippet-verified) | docs/TAIWANIA3_ETIQUETTE.md §4 |
 | `[W]` NCHC national center (Taiwania 3 overview) | https://www.nchc.org.tw/ | institutional reference |
 
 ## 6. Software actually used in runs (installed / executed)

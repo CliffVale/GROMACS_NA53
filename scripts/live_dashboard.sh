@@ -36,6 +36,8 @@ cd "$REPO_ROOT"
 
 EVERY=30 TARGET_NS=100 ONCE=0 PROFILE=""
 NO_COLOR=0 NO_CLEAR=0
+# poll-to-poll rate state (live ns/day needs two renders ≥15 s apart)
+POLL_TS=0 POLL_PS="" POLL_STAGE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --every)     EVERY="${2:-30}"; shift 2 ;;
@@ -126,9 +128,10 @@ parse_log() { # $1=stage → sets total_steps total_ps cur_step cur_ps temp
         if [ -z "$log_age" ]; then
             log_age=$(( $(date +%s) - $(stat -c %Y "$src" 2>/dev/null || echo "$(date +%s)") ))
         fi
-        # total: last "N steps, X ps." (prod RESTART appends further starts)
+        # total: last "N steps, X ps." (prod RESTART appends further starts);
+        # allow leading space — gmx may indent it in the .log sidecar
         if [ -z "$total_steps" ]; then
-            line=$(grep -E "^[0-9]+ steps, +[0-9.]+ ps\.$" "$src" | tail -1)
+            line=$(grep -E "^ *[0-9]+ steps, +[0-9.]+ ps\.$" "$src" | tail -1)
             if [ -n "$line" ]; then
                 total_steps=$(echo "$line" | awk '{print $1}')
                 total_ps=$(echo "$line" | awk '{print $3}')
@@ -212,7 +215,7 @@ render() {
     local rows running="" pending="" failed="" jid job st el lim reason
     local stage="" log="" total_steps="" total_ps="" cur_step="" cur_ps="" temp="" pres=""
     local fin_eta="" fin_step="" log_age=""
-    local rate="" nsday="" eta_s="" eta_s2="" pct="" bar=""
+    local rate="" r_ps="" nsday="" eta_s="" eta_s2="" pct="" bar=""
     local prep_done=0 equil_done=0 prod_done=0 ana_done=0 atoms="" n_figs=0
     local epoch_now; epoch_now=$(date +%s)
 
@@ -250,33 +253,49 @@ render() {
             for(i=0;i<w;i++) s=s (i<n?"█":"░"); print s }')
     fi
 
-    # ── throughput / ETAs (only while the log is FRESH — a stale log is a
-    # dead stage, and its age-based "speed" is meaningless) ──
-    if [ -n "$stage" ] && [ -n "$cur_ps" ] && [ -n "$total_ps" ] \
-       && [ "$log_age" -le 600 ]; then
-        if [ -n "$fin_eta" ]; then
+    # ── live rate + ETAs (fresh-log gate only; a stale log is a dead stage) ──
+    if [ -n "$stage" ] && [ -n "$cur_ps" ] && [ "$log_age" -le 600 ]; then
+        # 1) mdrun's own ETA line (stdout capture), when present
+        if [ -n "$fin_eta" ] && [ -n "$total_steps" ]; then
             local fe
             fe=$(date -d "$fin_eta" +%s 2>/dev/null || echo "")
-            if [ -n "$fe" ] && [ "$fe" -gt "$epoch_now" ]; then
+            if [ -n "$fe" ] && [ "$fe" -gt "$epoch_now" ] \
+               && [ -n "$fin_step" ] && [ "$total_steps" -gt "$fin_step" ] 2>/dev/null; then
                 eta_s=$(( fe - epoch_now ))
-                if [ -n "$fin_step" ] && [ -n "$total_steps" ] \
-                   && [ "$total_steps" -gt "$fin_step" ] 2>/dev/null; then
-                    rate=$(awk -v r="$(( total_steps - fin_step ))" -v e="$eta_s" \
-                           'BEGIN{ if (e > 0) printf "%.2f", r/e }')
+                rate=$(awk -v r="$(( total_steps - fin_step ))" -v e="$eta_s" \
+                       'BEGIN{ if (e > 0) printf "%.2f", r/e }')
+                if [ -n "$rate" ]; then
+                    nsday=$(awk -v r="$rate" 'BEGIN{ printf "%.1f", r*2e-3*86400/1000 }')   # 2 fs/step
+                    if [ -n "$cur_step" ] && [ "$total_steps" -gt "$cur_step" ] 2>/dev/null; then
+                        eta_s2=$(awk -v rem="$(( total_steps - cur_step ))" -v r="$rate" \
+                                 'BEGIN{ if (r > 0) printf "%d", rem / r }')
+                    fi
                 fi
             fi
         fi
-        if [ -z "$rate" ] && [ "$log_age" -gt 5 ]; then
-            nsday=$(awk -v p="$cur_ps" -v a="$log_age" 'BEGIN{ printf "%.1f (est.)", p/a*86400/1000 }')
+        # 2) poll-to-poll Δps/Δt — works with NO totals and NO ETA line
+        if [ -z "$rate" ]; then
+            local now2 dt dps
+            now2=$(date +%s)
+            if [ "$POLL_STAGE" = "$stage" ] && [ -n "$POLL_PS" ] \
+               && [ "$now2" -gt "$POLL_TS" ] && [ "$(( now2 - POLL_TS ))" -ge 15 ] \
+               && awk -v a="$cur_ps" -v b="$POLL_PS" 'BEGIN{exit !(a>b)}'; then
+                dt=$(( now2 - POLL_TS ))
+                dps=$(awk -v a="$cur_ps" -v b="$POLL_PS" 'BEGIN{printf "%.3f", a-b}')
+                r_ps=$(awk -v d="$dps" -v t="$dt" 'BEGIN{ if (t>0) printf "%.2f", d/t }')
+                if [ -n "$r_ps" ]; then
+                    nsday=$(awk -v r="$r_ps" 'BEGIN{ printf "%.1f", r*86.4 }')   # ps/s → ns/day
+                    if [ -n "$total_ps" ] \
+                       && awk -v t="$total_ps" -v c="$cur_ps" 'BEGIN{exit !(t>c)}'; then
+                        eta_s2=$(awk -v rem="$(( ${total_ps%.*} - ${cur_ps%.*} ))" -v r="$r_ps" \
+                                 'BEGIN{ if (r > 0) printf "%d", rem / r }')
+                    fi
+                fi
+            fi
+            POLL_STAGE="$stage"; POLL_PS="$cur_ps"; POLL_TS="$now2"
         fi
-        if [ -n "$rate" ]; then
-            nsday=$(awk -v r="$rate" 'BEGIN{ printf "%.1f", r*2e-3*86400/1000 }')   # 2 fs/step
-        fi
-        if [ -n "$rate" ] && [ -n "$total_steps" ] && [ -n "$cur_step" ] \
-           && [ "$total_steps" -gt "$cur_step" ] 2>/dev/null; then
-            eta_s2=$(awk -v rem="$(( total_steps - cur_step ))" -v r="$rate" \
-                     'BEGIN{ if (r > 0) printf "%d", rem / r }')
-        fi
+    else
+        POLL_STAGE=""; POLL_PS=""; POLL_TS=0
     fi
 
     # ── output ──
@@ -313,15 +332,17 @@ render() {
         echo "    ${C_B}${STAGE_LABEL[$stage]}${C_0}"
         if [ -n "$bar" ]; then
             echo "    ${bar} ${C_B}${pct}%${C_0}"
+        elif [ -n "$cur_ps" ] && [ -z "$total_ps" ]; then
+            # mdrun start line (the totals) lives in the stdout capture, which
+            # this run doesn't write — show elapsed progress without a bar
+            echo "    ${C_Y}sim ${cur_ps} ps elapsed — total not in log (bar unavailable)${C_0}"
         else
             echo "    ${C_D}(waiting for the first energy block — log age ${log_age}s)${C_0}"
         fi
-        [ -n "$cur_step" ] && [ -n "$total_steps" ] && \
-            echo "    step ${cur_step} / ${total_steps}"
+        [ -n "$cur_step" ] && \
+            echo "    step ${cur_step}${total_steps:+ / ${total_steps}}"
         if [ -n "$cur_ps" ] && [ -n "$total_ps" ]; then
             echo "    sim  ${C_B}${cur_ps}${C_0} ps / ${total_ps} ps"
-        elif [ -n "$total_ps" ]; then
-            echo "    sim  0.0 ps / ${total_ps} ps"
         fi
     else
         echo "    ${C_Y}(between MD stages — prep/analysis running, or idle)${C_0}"
@@ -340,9 +361,11 @@ render() {
 
     echo "  ${C_B}SPEED + ETA${C_0}"
     if [ -n "$nsday" ]; then
-        echo "    ns/day ${C_B}${nsday}${C_0}${rate:+  (${rate} steps/s @ 2 fs)}"
+        echo "    ns/day ${C_B}${nsday}${C_0}${rate:+  (${rate} steps/s @ 2 fs)}${r_ps:+  (${r_ps} ps/s)}"
     elif [ -n "$log_age" ] && [ "$log_age" -gt 600 ]; then
         echo "    ns/day ${C_D}— log stale (${log_age}s old) — no live speed${C_0}"
+    elif [ -n "$cur_ps" ]; then
+        echo "    ns/day ${C_D}— measuring (needs two polls ≥15 s apart)${C_0}"
     else
         echo "    ns/day ${C_D}— need the first energy block${C_0}"
     fi
@@ -375,10 +398,16 @@ render() {
     echo "    04 analysis  $(stage_icon "$ana_done" "$stage" ana)" \
          "${C_D}${n_figs} figure(s)${C_0}"
 
-    # ── raw mdrun output (newest logs/mdrun_*.log) ──
+    # ── raw mdrun output: the active stage's stdout capture, or its .log
+    # sidecar when the capture is missing (as in the current T3 prod run) ──
     local mlog
-    mlog=$(ls -t logs/mdrun_*.log 2>/dev/null | head -1)
-    if [ -n "$mlog" ]; then
+    if [ -n "$stage" ]; then
+        mlog="logs/mdrun_${stage}.log"
+        [ -f "$mlog" ] || mlog="scripts/${stage}.log"
+    else
+        mlog=$(ls -t logs/mdrun_*.log 2>/dev/null | head -1)
+    fi
+    if [ -n "$mlog" ] && [ -f "$mlog" ]; then
         echo "  ${C_B}LOG${C_0}    ${C_D}tail of ${mlog}${C_0}"
         tail -n 4 "$mlog" 2>/dev/null | sed "s/^/    ${C_D}/; s/$/${C_0}/"
     fi

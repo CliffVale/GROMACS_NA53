@@ -14,7 +14,11 @@ dependencies:
   - python=3.10
   - gromacs=2024.4
   - ambertools=23
-  - viennarna
+  # INCIDENT 2026-09-04 (2): `viennarna` was listed here but is NOT on
+  # conda-forge (it is bioconda-only) -> conda env create failed with
+  # PackagesNotFoundError on a pure conda-forge env. It was only a FALLBACK
+  # for 2D prediction behind pip-installed seqfold (the primary), so it is
+  # removed. If RNAfold is ever needed: conda install -c bioconda viennarna
   - numpy
   - scipy
   - matplotlib

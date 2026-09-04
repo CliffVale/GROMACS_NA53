@@ -123,7 +123,7 @@ if [ $? -ne 0 ]; then
         # Method 3: Simple hairpin prediction (fallback)
         echo "  ⚠️  No prediction tool available — using simple hairpin model"
         echo "  ℹ  Install seqfold: pip install seqfold"
-        echo "  ℹ  Or install ViennaRNA: conda install -c conda-forge viennarna"
+        echo "  ℹ  Or install ViennaRNA: conda install -c bioconda viennarna"
 
         # Generate a simple hairpin-like structure as placeholder
         python3 << PYEOF2

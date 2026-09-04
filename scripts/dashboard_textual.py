@@ -288,7 +288,33 @@ def main(argv=None):
     ap.add_argument("--every", type=int, default=15)
     ap.add_argument("--target-ns", type=int, default=100)
     ap.add_argument("--profile", default="")
+    ap.add_argument("--check", action="store_true",
+                    help="headless: run one refresh pass and print any error "
+                         "as plain text (no TUI) — for diagnosis")
     args = ap.parse_args(argv)
+    if args.check:
+        import asyncio
+        err_log = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "logs", "dashboard_error.log")
+
+        async def probe():
+            app = NA53Dashboard(every=60, target_ns=args.target_ns,
+                                profile=args.profile)
+            async with app.run_test(size=(100, 30)) as pilot:
+                await pilot.pause()
+                app.refresh_data()
+                await pilot.pause()
+        asyncio.run(probe())
+        try:
+            tail = open(err_log, errors="replace").read().splitlines()[-40:]
+            if tail:
+                print("── last error(s) in logs/dashboard_error.log ──")
+                print("\n".join(tail))
+            else:
+                print("✅ headless refresh OK — no errors logged")
+        except OSError:
+            print("✅ headless refresh OK (no error log file)")
+        return 0
     app = NA53Dashboard(every=args.every, target_ns=args.target_ns,
                         profile=args.profile)
     app.run()

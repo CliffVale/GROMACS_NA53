@@ -48,6 +48,7 @@
 | 2026-09-04 | **Trial run, 2nd wave — production & analysis bugs → fixed:** `-gpu-id` invalid in mdrun 2021+ (→ `-gpu_id`); prod mdrun was backgrounded w/o wait → died on shell exit → foreground (all stages consistent); analysis group indices targeted group 4 = **Water** → group 1 = **DNA** for RMSD/RMSF/covar/anaeig/cluster; hbond rewritten in GROMACS 2024+ (stdin piping dead, `-life`/`-ghost` removed) → modern `-r 'group DNA' -t 'group DNA'` selections; sasa duplicate `-o` → `-o` + `-or`; covar `-lpc` removed (2025.3); anaeig needs 2 stdin answers (fit + eigenvector group); cluster `-o` requires `.xpm`; STATUS_FILE/JOBS_DIR anchored to repo root (was split across logs/ + scripts/logs/) | scripts/03_production.sh, scripts/04_analysis.sh, run_simulation.sh |
 | 2026-09-04 | **End-to-end trial re-run PASSED** (post-fix): 0 ⚠️, DNA H-bonds 30–38 (~30 WC bonds for 12 bp — sanity ✓), 1 ns in ~5 min GPU | analysis/, results/figures/ (gitignored, kept locally) |
 | 2026-09-04 | **From-scratch clone-and-run test** (`NA53_1ns_trial_from scratch/`, fresh `git clone` from GitHub = server mimic): **2 packaging bugs caught** — (a) all files committed mode 100644 so `./run_simulation.sh` → Permission denied on a real Linux clone (fixed via `git update-index --chmod=+x`, commit 95eb74b, verified 755 materializes on clone); (b) `.gitignore` globs `em.*`/`nvt.*`/`npt*.*` (meant for grompp/mdrun OUTPUTS) silently swallowed the **stage MDP configs** → fresh clone lacked em/nvt/npt/npt_free.mdp and equil died at EM grompp (`../configs/em.mdp does not exist`) (fixed with `!em.mdp` etc. negations, commit aadddb9). After fixes the clone ran prep→equil→1 ns prod→analysis→8 figures with 0 ⚠️ | commits 95eb74b, aadddb9 |
+| 2026-09-04 | **Postmortem + prevention layer** (docs/INCIDENT_ANALYSIS.md): all incidents classified into 5 root-cause classes — V version drift (6), P physics/config (4), S shell fragility (4), G group-index (1), K packaging (2). Prevention per class: `scripts/check_repo_integrity.sh` (static; runs in **CI on every push**) + `./run_simulation.sh doctor` (static + live gmx-flag/group probes); rules.md golden rules 9–13 + §2.4/§5.7/§7 git rules; memory §4.3 gotcha table. Doctor itself initially false-failed: gmx `-h` prints to **stderr** (needs `2>&1`) and `grep -q` early-exit SIGPIPEs under `set -o pipefail` (needs `grep -c`) — both fixed | docs/INCIDENT_ANALYSIS.md, scripts/check_repo_integrity.sh, doctor cmd, rules.md, validate.yml |
 
 ## 3. Files — Current Ownership & Status
 
@@ -150,6 +151,19 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | Local measured rate | 1 ns in ~5 min on GTX 1650 Ti (~66k atoms system) | trial log 09-04 |
 | pdb2gmx index layout (DNA+NaCl+water) | 0 System, **1 DNA**, 2 NA, 3 CL, 4 Water, 5 SOL, 6 non-Water, 7 Ion | `gmx make_ndx` on trial tpr |
 | gmx hbond (2024+) | selections via `-r`/`-t` CLI; `-life`/`-ghost`/stdin-piping gone | `gmx hbond -h` 2025.3 |
+
+### 4.3 GROMACS version gotchas (2025.3 build; full postmortem in docs/INCIDENT_ANALYSIS.md)
+| Tool / area | Gotcha | Verified on |
+|---|---|---|
+| mdrun | flag is `-gpu_id` (underscore); `-gpu-id` aborts | 2025.3 `mdrun -h` |
+| hbond | GROMACS 2024+ rewrite: selections via CLI `-r`/`-t`; `-life`/`-ghost`/stdin piping removed | `hbond -h` |
+| covar | `-lpc` removed | `covar -h` |
+| sasa | per-residue output is `-or` (duplicate `-o` aborts) | `sasa -h` |
+| cluster | `-o` accepts only `.xpm` matrix output | `cluster -h` |
+| anaeig | prompts for TWO groups (covar fit group + eigenvector group) via stdin | trial logs |
+| Analysis group layout | pdb2gmx DNA+NaCl index: 0 System, **1 DNA**, 2 NA, 3 CL, 4 Water | `make_ndx` |
+| Group indices are system-dependent | never assume tutorial numbering (group 4 = Water here!) | G1 incident |
+| Version policy | verify any gmx flag via `gmx <tool> -h` on the actual build; `doctor` probes the pipeline's flags | V1–V6 incidents |
 
 ---
 

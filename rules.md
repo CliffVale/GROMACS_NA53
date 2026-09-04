@@ -3,7 +3,7 @@
 | Field | Value |
 |---|---|
 | **Status** | Active — bindings for any AI working in this repo |
-| **Last updated** | 2026-09-03 |
+| **Last updated** | 2026-09-04 |
 
 > Read this file **before** modifying anything. It encodes every hard lesson from
 > the GROMACS_TEEP trial runs and the Taiwania 3 hallucination audit.
@@ -33,6 +33,25 @@
    other).
 8. **CPU-first on Taiwania 3.** GPU partitions are restricted (`ngs*`) or down
    (`gpu-amd`); there is no CUDA module. Default everything to `-nb auto`.
+9. **Version-check every gmx flag against the live build** (`gmx <tool> -h`)
+   before first use. CLI drift has broken mdrun (`-gpu_id`), hbond (2024
+   rewrite: `-r`/`-t` selections, no `-life`/`-ghost`/stdin), covar (`-lpc`
+   gone), sasa (`-or`), cluster (`.xpm`). Gotchas live in `memory.md §4.3`.
+10. **Never assume group numbering from a tutorial.** Index groups are
+    system-dependent — on this DNA+NaCl system group 1 = DNA, group 4 = Water
+    (analyzing water instead of DNA produced silent nonsense). `doctor`
+    re-verifies group 1 = DNA against the real structure.
+11. **mdrun runs in the foreground of stage scripts.** No fire-and-forget
+    backgrounding without an explicit wait; gate stages on real exit codes,
+    never on log-scraping or output pipes (they mask failures).
+12. **Every runtime input must ship in a fresh clone.** A required file that is
+    gitignored is a bug (`.gitignore` once swallowed `em/nvt/npt/npt_free.mdp`).
+    CI enforces this on every push; run the fresh-clone acceptance test after
+    significant changes.
+13. **MDP configs must match the validated standard** (0.8 nm, shift-Verlet,
+    PME only in real stages, `-DPOSRES`, `refcoord_scaling=com`, no prod
+    restraints). The static checker enforces it — do not edit an MDP without
+    re-running `scripts/check_repo_integrity.sh`.
 
 ---
 
@@ -69,8 +88,13 @@
 1. Live command output on the target machine
 2. `docs/TRANSCRIPTS_DEEP_ANALYSIS.md` (verified cluster facts)
 3. `docs/LESSONS_LEARNED_FROM_TRIAL_RUNS.md` (validated parameters)
-4. `docs/APTAMD_DEEP_ANALYSIS.md` (protocol comparisons)
-5. Cited literature (AMBER99bsc1, TIP3P, aptamer–ligand MD refs in README)
+4. `docs/INCIDENT_ANALYSIS.md` (bug classes V/P/S/G/K + prevention map)
+5. `docs/APTAMD_DEEP_ANALYSIS.md` (protocol comparisons)
+6. Cited literature (AMBER99bsc1, TIP3P, aptamer–ligand MD refs in README)
+
+### 2.4 Automated guards (run, don't skip)
+- `bash scripts/check_repo_integrity.sh` — static integrity (runs in CI on every push)
+- `./run_simulation.sh doctor` — static + live gmx/group probes on the target machine
 
 ---
 
@@ -119,6 +143,8 @@
 5. On any non-zero exit, report the stage, the log file, and the last ~10 lines
    of that log. Do not "fix forward" blindly — read the error first.
 6. Checkpoint discipline: never delete `prod.cpt`; it is the resume point.
+7. Never evaluate a stage through an output pipe (`cmd | grep | tail` masks the
+   exit code). Capture to a log and check `$?` (see S2 in INCIDENT_ANALYSIS.md).
 
 ---
 
@@ -128,6 +154,7 @@
 - Read any file, run any read-only command (`gmx --version`, `sinfo`, `module avail`).
 - Edit scripts/configs/docs to fix bugs or add features per this rules file.
 - Run syntax checks (`bash -n`, `python -m py_compile`) and CI locally.
+- Run `bash scripts/check_repo_integrity.sh` and `./run_simulation.sh doctor`.
 - Stage/commit changes when explicitly asked (git commit only, no push).
 
 ### 6.2 Must ask first
@@ -158,6 +185,10 @@
 - Never commit: `*.gro *.xtc *.tpr *.trr *.edr *.cpt *.log *.xvg` (see .gitignore).
 - Keep `structures/NA53_initial.pdb` committed (it's the one real input).
 - Do not commit `.conda/` or `__pycache__/`.
+- Entry-point scripts must be mode 100755 in the git index (`git update-index
+  --chmod=+x` on filesystems that can't store exec bits); CI enforces.
+- Never add a gitignore pattern that matches a runtime **input** file — verify
+  with `git check-ignore` (see K2 in INCIDENT_ANALYSIS.md); CI enforces.
 
 ---
 

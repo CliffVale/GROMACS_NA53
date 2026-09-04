@@ -66,6 +66,7 @@ ssh u5662994@twnia3.nchc.org.tw          # 2FA app OTP
 cd ~ && git clone https://github.com/CliffVale/GROMACS_NA53.git && cd GROMACS_NA53
 bash slurm/setup_taiwania3.sh https://github.com/CliffVale/GROMACS_NA53.git
 ./run_simulation.sh profile --set taiwania3_cpu
+./run_simulation.sh doctor                             # pre-flight: static checks + live gmx probes
 ./run_simulation.sh submit --profile taiwania3_cpu      # chain 01→02→03→04 (afterok deps)
 ./run_simulation.sh status                             # snapshot (squeue + status + log tail)
 ./run_simulation.sh monitor                           # live follow from THIS machine (OTP prompt)
@@ -77,6 +78,7 @@ bash slurm/setup_taiwania3.sh https://github.com/CliffVale/GROMACS_NA53.git
 ./run_simulation.sh submit --profile taiwania3_gpu             # then submit
 
 # ── Workstation GPU / dev trials ───────────────────────────
+./run_simulation.sh doctor --profile local_gpu        # pre-flight (no gmx flags needed)
 ./run_simulation.sh start --profile local_gpu --ns 20 --stage all
 ./run_simulation.sh start --profile local_gpu --stage analysis  # resume analysis only
 ```
@@ -84,6 +86,14 @@ bash slurm/setup_taiwania3.sh https://github.com/CliffVale/GROMACS_NA53.git
 Each stage is a file gate: re-running skips nothing but fails loudly if its input
 artifact is missing; production checkpoints every 15 min and resumes with
 `RESTART=1 sbatch slurm/03_prod.sbatch` (walltime kills cost nothing).
+
+> **🩺 Pre-flight is mandatory.** Run `./run_simulation.sh doctor` before the
+> first submit/start on any machine — it checks repo integrity (every runtime
+> file present and not gitignored, exec bits, MDP consistency with the
+> validated 0.8 nm standard) and probes the **live** gmx build for every CLI
+> flag the pipeline uses (a GROMACS version change silently breaks these). CI
+> runs the same static checks on every push. Full postmortem of every bug
+> class: [`docs/INCIDENT_ANALYSIS.md`](docs/INCIDENT_ANALYSIS.md).
 
 ---
 

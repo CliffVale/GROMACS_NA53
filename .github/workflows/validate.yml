@@ -117,3 +117,12 @@ jobs:
             exit 1
           fi
           echo "✅ No unresolved placeholders"
+
+      # Postmortem guard (docs/INCIDENT_ANALYSIS.md): catches on every push the
+      # classes that previously shipped broken: missing/gitignored runtime files
+      # (K2 — .gitignore swallowed configs/em,nvt,npt,npt_free.mdp), non-executable
+      # entry points (K1), MDP drift from the validated standard (P), placeholders.
+      - name: Repo integrity (scripts/check_repo_integrity.sh)
+        run: |
+          set -euo pipefail
+          bash scripts/check_repo_integrity.sh

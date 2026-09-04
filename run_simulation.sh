@@ -9,12 +9,14 @@
 # Usage:
 #   ./run_simulation.sh profile [--profile NAME] [--set NAME]
 #   ./run_simulation.sh env  [--profile NAME]          # print engine-setup snippet
+#   ./run_simulation.sh doctor [--profile NAME]        # pre-run health check (static + live gmx probes)
 #   ./run_simulation.sh start  [--profile NAME] [--ns N] [--stage all|prep|equil|prod|analysis] [--pdb FILE]
 #   ./run_simulation.sh submit [--profile NAME] [--ns N] [--dry-run]
 #   ./run_simulation.sh status [--profile NAME] [--local]
 #   ./run_simulation.sh monitor [--profile NAME] [--once]
 #
 # Profiles live in profiles/*.env — see profiles/README.md.
+# Postmortem + prevention map: docs/INCIDENT_ANALYSIS.md.
 # ============================================================
 
 set -euo pipefail
@@ -388,11 +390,86 @@ cmd_monitor() {
     fi
 }
 
+# ─── Subcommand: doctor (pre-run health check) ─────────────
+# Guards the bug classes from docs/INCIDENT_ANALYSIS.md:
+#  - static repo integrity (C1..C5) via scripts/check_repo_integrity.sh
+#  - LIVE probes of the gmx build the profile selects (V1/V4/V5 flag drift)
+#  - group-layout sanity vs a real prepared structure (G1)
+cmd_doctor() {
+    local flag_name=""
+    while [ $# -gt 0 ]; do case "$1" in --profile) flag_name="$2"; shift 2;; *) shift;; esac; done
+    load_profile "$flag_name"
+    echo "── doctor | profile: $PROFILE_NAME_CUR ──"
+    local failed=0
+
+    echo ""
+    echo "▶ 1/3  Static repo integrity (scripts/check_repo_integrity.sh)"
+    if bash scripts/check_repo_integrity.sh; then
+        echo "  ✅ static checks passed"
+    else
+        echo "  ❌ static checks FAILED — fix before running any stage"
+        failed=1
+    fi
+
+    echo ""
+    echo "▶ 2/3  Live gmx probes on $(command -v gmx >/dev/null 2>&1 && echo 'current PATH' || echo 'PATH after profile ENV_SETUP')"
+    setup_env
+    hash -r 2>/dev/null || true
+    if ! command -v gmx >/dev/null 2>&1; then
+        echo "  ❌ gmx not found after profile ENV_SETUP — run './run_simulation.sh env'"
+        return 1
+    fi
+    gmx --version 2>/dev/null | head -1 | sed 's/^/  ✅ /'
+    # grep -c reads the full stream (no early-exit SIGPIPE under pipefail) and
+    # gmx prints -h help to STDERR, so 2>&1 is required — see docs/INCIDENT_ANALYSIS.md S2
+    probe_flag() { # label, gmx -h command, expected token
+        local hits
+        hits=$(eval "$2" 2>&1 | grep -cE -- "$3" || true)
+        if [ "${hits:-0}" -gt 0 ]; then
+            echo "  ✅ $1"
+        else
+            echo "  ❌ $1 — missing on this build; see docs/INCIDENT_ANALYSIS.md class V"
+            failed=1
+        fi
+    }
+    probe_flag "mdrun  -gpu_id (V1)"        "gmx mdrun -h"            "-gpu_id"
+    probe_flag "hbond  -r selection (V5)"   "gmx hbond -h"            "-r <selection>"
+    probe_flag "hbond  -t selection (V5)"   "gmx hbond -h"            "-t <selection>"
+    probe_flag "sasa   -or per-residue (V4)" "gmx sasa -h"            "-or "
+    probe_flag "cluster -o accepts .xpm only (V6)" "gmx cluster -h"     "<.xpm>"
+
+    echo ""
+    echo "▶ 3/3  Group-layout sanity (G1)"
+    local gro=""
+    gro=$(ls -t scripts/*_ionized.gro 2>/dev/null | head -1)
+    if [ -n "$gro" ]; then
+        local hits
+        hits=$(printf 'q\n' | gmx make_ndx -f "$gro" -o /dev/null 2>&1 | grep -cE "^ *1 DNA " || true)
+        if [ "${hits:-0}" -gt 0 ]; then
+            echo "  ✅ index group 1 = DNA on $gro (04_analysis.sh targets this)"
+        else
+            echo "  ❌ index group 1 is NOT 'DNA' on $gro — analysis would target the wrong molecule; fix 04_analysis.sh group indices"
+            failed=1
+        fi
+    else
+        echo "  ⚠️  no ionized structure yet — group check runs once prep is done (run: ./run_simulation.sh start --stage prep)"
+    fi
+
+    echo ""
+    if [ "$failed" -gt 0 ]; then
+        echo "❌ doctor: $failed check(s) FAILED — do not start stages yet"
+        echo "   See docs/INCIDENT_ANALYSIS.md (bug classes V/P/S/G/K + fixes)."
+        return 1
+    fi
+    echo "✅ doctor: all checks passed — safe to start/submit."
+}
+
 # ─── Dispatch ──────────────────────────────────────────────
 cmd="${1:-usage}"
 case "$cmd" in
     profile)  shift; cmd_profile "$@" ;;
     env)      shift; cmd_env "$@" ;;
+    doctor)   shift; cmd_doctor "$@" ;;
     start)    shift; cmd_start "$@" ;;
     submit)   shift; cmd_submit "$@" ;;
     status)   shift; cmd_status "$@" ;;

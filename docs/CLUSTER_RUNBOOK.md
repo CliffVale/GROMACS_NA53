@@ -33,6 +33,7 @@ atoms). Fix in the modeling tool and re-validate; **never commit an unvalidated 
 ssh u5662994@twnia3.nchc.org.tw          # 2FA: method 1 (app OTP) + password
 cd ~
 bash slurm/setup_taiwania3.sh https://github.com/CliffVale/GROMACS_NA53.git
+# (setup now auto-accepts the conda 25.x Anaconda-ToS gate — see slurm/setup_taiwania3.sh)
 # (after it finishes, verify the engine once:)
 conda activate na53_aptamer
 gmx --version 2>&1 | head -1             # expect: GROMACS 2024.4 ...

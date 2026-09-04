@@ -70,6 +70,15 @@ else
     source "$HOME/miniconda3/etc/profile.d/conda.sh"
 fi
 
+# INCIDENT 2026-09-04: conda 25.x gates repo.anaconda.com behind an interactive
+# ToS acceptance (CondaToSNonInteractiveError) that aborts `conda env create`
+# even when environment.yml is pure conda-forge. Accept non-interactively here
+# (guarded: old conda without the `tos` subcommand skips). One-time per account.
+if conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main >/dev/null 2>&1; then
+    conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r >/dev/null 2>&1 || true
+    echo "  ✓ Anaconda ToS accepted (one-time)"
+fi
+
 # Refresh env from environment.yml (adds gromacs if missing)
 if conda env list | grep -q "^${CONDA_ENV} "; then
     echo "  ✓ Environment exists — updating with environment.yml..."

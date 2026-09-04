@@ -87,7 +87,8 @@ if [ "$STAGE" = "all" ] || [ "$STAGE" = "equil" ]; then
     echo "▶═══════════════════════════════════════════════════◀"
     echo "  WORK PACKAGE 3: EQUILIBRATION"
     echo "◀═══════════════════════════════════════════════════▶"
-    IONIZED_GRO=$(ls ../*_ionized.gro 2>/dev/null | head -1)
+    # 01_system_prep.sh colocates *_ionized.gro in scripts/ (stage workspace)
+    IONIZED_GRO=$(ls *_ionized.gro ../system/*_ionized.gro 2>/dev/null | head -1)
     if [ -z "$IONIZED_GRO" ]; then
         echo "❌ ERROR: No _ionized.gro found. Run 'prep' stage first."
         exit 1

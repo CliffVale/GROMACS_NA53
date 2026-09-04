@@ -17,10 +17,37 @@ jobs:
         run: |
           set -euo pipefail
           failed=0
-          for f in scripts/*.sh slurm/*.sbatch slurm/*.sh; do
+          for f in run_simulation.sh scripts/*.sh slurm/*.sbatch slurm/*.sh; do
             [ -f "$f" ] || continue
             if ! bash -n "$f"; then
               echo "❌ bash syntax error in $f"
+              failed=1
+            else
+              echo "✅ $f"
+            fi
+          done
+          exit $failed
+
+      - name: Validate machine profiles
+        run: |
+          set -euo pipefail
+          failed=0
+          for f in profiles/*.env; do
+            [ -f "$f" ] || continue
+            if ! (
+              set -a; source "$f"
+              : "${PROFILE_NAME:?missing}"
+              : "${ENV_SETUP+x}"
+              : "${MDRUN_GPU_FLAG+x}"
+              : "${PROD_NS:?missing}"
+              : "${PARTITION+x}" "${ACCOUNT+x}" "${GRES+x}"
+              : "${TIME_01:?missing}" "${CPUS_01:?missing}" "${MEM_01:?missing}"
+              : "${TIME_02:?missing}" "${CPUS_02:?missing}" "${MEM_02:?missing}"
+              : "${TIME_03:?missing}" "${CPUS_03:?missing}" "${MEM_03:?missing}"
+              : "${TIME_04:?missing}" "${CPUS_04:?missing}" "${MEM_04:?missing}"
+              : "${SSH_HOST+x}" "${SSH_USER+x}" "${REMOTE_DIR+x}"
+            ) 2>/dev/null; then
+              echo "❌ profile $f missing required variables"
               failed=1
             else
               echo "✅ $f"
@@ -32,7 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           failed=0
-          for f in scripts/*.py; do
+          for f in scripts/*.py research/scripts/*.py; do
             [ -f "$f" ] || continue
             if ! python3 -m py_compile "$f"; then
               echo "❌ python syntax error in $f"
@@ -42,6 +69,27 @@ jobs:
             fi
           done
           exit $failed
+
+      - name: Validate research run log (JSONL)
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import json, pathlib
+          p = pathlib.Path("research/deepsearch.log")
+          bad = 0
+          for i, line in enumerate(p.read_text().splitlines(), 1):
+              if not line or line.startswith("#"):
+                  continue
+              try:
+                  rec = json.loads(line)
+                  assert all(k in rec for k in ("ts", "query", "report", "sources_used", "tools")), "missing field"
+              except Exception as e:
+                  print(f"❌ line {i}: {e}")
+                  bad = 1
+          if bad:
+              raise SystemExit(1)
+          print(f"✅ research/deepsearch.log parses as JSONL")
+          EOF
 
       - name: Validate environment.yml
         run: |

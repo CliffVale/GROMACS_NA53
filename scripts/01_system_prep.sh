@@ -79,8 +79,11 @@ gmx solvate -cp "${BASENAME}_boxed.gro" -cs spc216.gro \
     -o "${BASENAME}_solvated.gro" -p topol.top \
     > "$LOG_DIR/solvate.log" 2>&1
 
-# Count water molecules
-NWAT=$(grep -c "SOL" "${BASENAME}_solvated.gro" || echo "?")
+# Count water molecules properly: .gro line 1 = title, line 2 = atom count.
+# Each TIP3P water = 3 atoms.
+NBOXED=$(sed -n '2p' "${BASENAME}_boxed.gro")
+NSOLV=$(sed -n '2p' "${BASENAME}_solvated.gro")
+NWAT=$(( (NSOLV - NBOXED) / 3 ))
 echo "  ✓ Solvation complete"
 echo "  ℹ  Water molecules added: ~$NWAT"
 
@@ -124,8 +127,8 @@ for f in "${BASENAME}_ionized.gro" topol.top; do
     fi
 done
 
-# Atom count
-NATOMS=$(head -1 "${BASENAME}_ionized.gro")
+# Atom count (.gro line 2 — line 1 is the title)
+NATOMS=$(sed -n '2p' "${BASENAME}_ionized.gro")
 echo "  ℹ  Total atoms: $NATOMS"
 
 echo ""

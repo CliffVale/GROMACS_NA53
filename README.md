@@ -39,6 +39,54 @@ read them in this order**:
 
 ---
 
+## 🔬 Research SOP (literature work)
+
+All literature/deep-search work for this project runs through the **Research SOP**
+in [`research/`](research/README.md):
+
+| File | What it is |
+|------|------------|
+| [`research/WORKFLOW.md`](research/WORKFLOW.md) | frame → search → verify → synthesize → log |
+| [`research/REPORT-TEMPLATE.md`](research/REPORT-TEMPLATE.md) | evidence-report scaffold |
+| [`research/REFERENCES.md`](research/REFERENCES.md) | ledger of only-consulted sources |
+| [`research/reports/`](research/reports/) | completed reports (founding NA53/NGAL review inside) |
+| [`research/scripts/s2_search.py`](research/scripts/s2_search.py) | keyless Semantic Scholar search + citation graph |
+| [`research/deepsearch.log`](research/deepsearch.log) | append-only JSONL run log |
+
+---
+
+## ⚡ Clone & Run (one command)
+
+The repo ships a machine-aware launcher — **clone once, run on any target** via
+profiles (`profiles/*.env`, see `profiles/README.md`):
+
+```bash
+# ── HPC (Taiwania 3 CPU — VERIFIED profile) ────────────────
+ssh u5662994@twnia3.nchc.org.tw          # 2FA app OTP
+cd ~ && git clone https://github.com/CliffVale/GROMACS_NA53.git && cd GROMACS_NA53
+bash slurm/setup_taiwania3.sh https://github.com/CliffVale/GROMACS_NA53.git
+./run_simulation.sh profile --set taiwania3_cpu
+./run_simulation.sh submit --profile taiwania3_cpu      # chain 01→02→03→04 (afterok deps)
+./run_simulation.sh status                             # snapshot (squeue + status + log tail)
+./run_simulation.sh monitor                           # live follow from THIS machine (OTP prompt)
+
+# ── GPU machine (after GPU access is granted) ──────────────
+# 1. read docs/HPC_GPU_OPTIONS.md (TWCC is offline; T3-GPU or TWAI T2 are the paths)
+# 2. fill profiles/taiwania3_gpu.env (or taiwania2_twai_gpu.env) from the §5 checklist
+./run_simulation.sh submit --profile taiwania3_gpu --dry-run   # inspect jobs first
+./run_simulation.sh submit --profile taiwania3_gpu             # then submit
+
+# ── Workstation GPU / dev trials ───────────────────────────
+./run_simulation.sh start --profile local_gpu --ns 20 --stage all
+./run_simulation.sh start --profile local_gpu --stage analysis  # resume analysis only
+```
+
+Each stage is a file gate: re-running skips nothing but fails loudly if its input
+artifact is missing; production checkpoints every 15 min and resumes with
+`RESTART=1 sbatch slurm/03_prod.sbatch` (walltime kills cost nothing).
+
+---
+
 ## 🚀 Quick Start (Complete Pipeline)
 
 ```bash
@@ -97,6 +145,14 @@ GROMACS_NA53/
 ├── environment.yml                # Conda environment specification
 ├── .gitignore                     # Git ignore rules
 ├── .github/workflows/validate.yml # CI: syntax validation
+├── run_simulation.sh              # ⚡ clone-and-run launcher (start/submit/status/monitor)
+│
+├── profiles/                      # Machine profiles (one repo, any cluster)
+│   ├── README.md                  # profile contract + auto-detect table
+│   ├── taiwania3_cpu.env          # ✅ VERIFIED — Taiwania 3 CPU ct56 (default)
+│   ├── taiwania3_gpu.env          # ⚠️ template — fill from docs/HPC_GPU_OPTIONS.md
+│   ├── taiwania2_twai_gpu.env     # ⚠️ template — TWAI Taiwania-2 V100
+│   └── local_gpu.env              # workstation GPU (GTX 1650 Ti / CachyOS)
 │
 ├── docs/                          # Project management documents
 │   ├── 01_PROJECT_CHARTER.md      # Mission directive & system definition
@@ -136,6 +192,15 @@ GROMACS_NA53/
 │
 ├── templates/                     # Reusable templates
 │   └── posre.itp                  # Position restraints template
+│
+├── research/                      # Research SOP (deep-search workflow)
+│   ├── README.md                  # SOP index — read this first
+│   ├── WORKFLOW.md                # frame → search → verify → synthesize → log
+│   ├── REPORT-TEMPLATE.md         # evidence-report scaffold
+│   ├── REFERENCES.md              # ledger of actually-used sources
+│   ├── deepsearch.log             # JSONL run log (tracked)
+│   ├── reports/                   # completed research reports
+│   └── scripts/                   # s2_search.py, log_run.py
 │
 ├── structures/                    # PDB files (input + processed)
 ├── system/                        # System files (.gro, .top)
@@ -302,4 +367,4 @@ bash scripts/install_dependencies.sh
 
 ---
 
-*Generated: 2026-09-03 | Project: GROMACS_NA53 | Target: NGAL Biosensing*
+*Generated: 2026-09-03 · Last updated: 2026-09-04 | Project: GROMACS_NA53 | Target: NGAL Biosensing*

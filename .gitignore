@@ -52,6 +52,17 @@ Thumbs.db
 logs/*.log
 logs/*.out
 logs/*.err
+logs/run_status.txt
+
+# Generated analysis + figure outputs from trial runs (regeneratable)
+/analysis/
+/results/
+
+# Generated SLURM jobs (run_simulation.sh submit regenerates these)
+slurm/jobs/
+
+# ...but the Research SOP run log IS tracked (small JSONL, part of the record)
+!research/deepsearch.log
 
 # Temp files
 *.tmp

@@ -21,13 +21,15 @@
 #SBATCH --partition=ct56
 #SBATCH --account=mst115368
 
-# ─── Environment Setup ────────────────────────────────────
+# >>> NA53_ENV_SETUP >>>
+# Environment Setup — replaced by ./run_simulation.sh submit (profile ENV_SETUP)
 module purge
 module load gcc/13.2.0 2>/dev/null || module load gcc 2>/dev/null || true
 
 source "${HOME}/miniconda3/etc/profile.d/conda.sh" 2>/dev/null || \
 source "${HOME}/anaconda3/etc/profile.d/conda.sh" 2>/dev/null || true
 conda activate na53_aptamer 2>/dev/null || true
+# <<< NA53_ENV_SETUP <<<
 
 cd "${SLURM_SUBMIT_DIR}/../scripts" || cd scripts
 
@@ -36,8 +38,8 @@ echo "Node:   $SLURM_NODELIST"
 echo "Start:  $(date)"
 gmx --version 2>&1 | head -1
 
-# Check trajectory exists
-if [ ! -f "../production/prod.xtc" ]; then
+# Check trajectory exists (03_prod.sbatch colocates prod.* in scripts/)
+if [ ! -f "prod.xtc" ]; then
     echo "❌ ERROR: prod.xtc not found. Run 03_prod.sbatch first."
     exit 1
 fi
@@ -50,4 +52,4 @@ python3 05_visualization.py ../analysis
 
 echo ""
 echo "End: $(date)"
-echo "Analysis complete — check ../results/figures/"
+echo "Analysis complete — check ../results/figures/ and ../analysis/"

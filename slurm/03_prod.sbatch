@@ -27,13 +27,15 @@
 #SBATCH --partition=ct56
 #SBATCH --account=mst115368
 
-# ─── Environment Setup ────────────────────────────────────
+# >>> NA53_ENV_SETUP >>>
+# Environment Setup — replaced by ./run_simulation.sh submit (profile ENV_SETUP)
 module purge
 module load gcc/13.2.0 2>/dev/null || module load gcc 2>/dev/null || true
 
 source "${HOME}/miniconda3/etc/profile.d/conda.sh" 2>/dev/null || \
 source "${HOME}/anaconda3/etc/profile.d/conda.sh" 2>/dev/null || true
 conda activate na53_aptamer 2>/dev/null || true
+# <<< NA53_ENV_SETUP <<<
 
 cd "${SLURM_SUBMIT_DIR}/../scripts" || cd scripts
 
@@ -42,11 +44,11 @@ echo "Node:   $SLURM_NODELIST"
 echo "Start:  $(date)"
 gmx --version 2>&1 | head -1
 
-# Restart path (RESTART=1): continue from saved checkpoint
-if [ -f "../production/prod.cpt" ] && [ "${RESTART:-0}" = "1" ]; then
+# Restart path (RESTART=1): continue from saved checkpoint.
+# prod.cpt is colocated in scripts/ (the stage workspace).
+if [ -f "prod.cpt" ] && [ "${RESTART:-0}" = "1" ]; then
     echo "▶ Restarting from checkpoint..."
-    cd ../production
-    gmx mdrun -deffnm prod -cpi prod.cpt -ntomp 56
+    gmx mdrun -deffnm prod -cpi prod.cpt -ntomp 56 -cpo prod -cpt 900
     echo "Production restarted from checkpoint"
     exit 0
 fi
@@ -67,15 +69,15 @@ echo "▶ Starting production MD ($NS_LENGTH ns = $NSTEPS steps, CPU 56 threads)
 cp ../configs/prod.mdp prod_mdp_temp.mdp
 sed -i "s/nsteps.*/nsteps          = $NSTEPS/" prod_mdp_temp.mdp
 
-# Generate TPR
+# Generate TPR (colocated with topol.top/npt2.gro in scripts/)
 gmx grompp -f prod_mdp_temp.mdp -c npt2.gro \
-    -p topol.top -o ../production/prod.tpr
+    -p topol.top -o prod.tpr
 rm -f prod_mdp_temp.mdp
 
 # Run — checkpoint every 15 min so a walltime kill costs nothing
-cd ../production
 gmx mdrun -deffnm prod -ntomp 56 -cpo prod -cpt 900
 
 echo ""
 echo "End: $(date)"
 echo "Production complete — submit 04_analysis.sbatch next"
+echo "Artifacts colocated in scripts/: prod.tpr prod.xtc prod.cpt topol.top"

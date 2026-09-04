@@ -42,42 +42,51 @@ run_analysis() {
     echo "  ✓ $name complete"
 }
 
+# ── Index-group layout (pdb2gmx default, DNA+NaCl+water system) ──
+#   0 System  1 DNA  2 NA  3 CL  4 Water  5 SOL  6 non-Water  7 Ion
+#   ALL solute analyses below target group 1 (DNA). If you change the
+#   system composition, verify with: gmx make_ndx -f <tpr> → 'q'
 # ═══════════════════════════════════════════════════════════
-# ANALYSIS 1: RMSD (Root Mean Square Deviation)
+# ANALYSIS 1: RMSD (Root Mean Square Deviation) — DNA
 # ═══════════════════════════════════════════════════════════
 run_analysis "RMSD" \
-    "echo '4 4' | gmx rms -s $TPR_FILE -f $XTC_FILE \
+    "echo '1 1' | gmx rms -s $TPR_FILE -f $XTC_FILE \
     -o $ANALYSIS_DIR/rmsd.xvg -tu ns -b $SKIP"
 
 # ═══════════════════════════════════════════════════════════
-# ANALYSIS 2: RMSF (Root Mean Square Fluctuation)
+# ANALYSIS 2: RMSF (Root Mean Square Fluctuation) — DNA
 # ═══════════════════════════════════════════════════════════
 run_analysis "RMSF" \
-    "echo '4' | gmx rmsf -s $TPR_FILE -f $XTC_FILE \
+    "echo '1' | gmx rmsf -s $TPR_FILE -f $XTC_FILE \
     -o $ANALYSIS_DIR/rmsf.xvg -res -b $SKIP"
 
 # ═══════════════════════════════════════════════════════════
-# ANALYSIS 3: Radius of Gyration
+# ANALYSIS 3: Radius of Gyration — DNA
 # ═══════════════════════════════════════════════════════════
 run_analysis "Radius_of_Gyration" \
     "echo '1' | gmx gyrate -s $TPR_FILE -f $XTC_FILE \
     -o $ANALYSIS_DIR/gyrate.xvg -b $SKIP"
 
 # ═══════════════════════════════════════════════════════════
-# ANALYSIS 4: Hydrogen Bonds
+# ANALYSIS 4: Hydrogen Bonds — intramolecular DNA H-bonds
 # ═══════════════════════════════════════════════════════════
+# NOTE: GROMACS 2024+ rewrote gmx hbond: selections are CLI args
+# (-r reference / -t target); stdin piping no longer works, and
+# -life/-ghost are gone. Selections target group DNA explicitly.
 run_analysis "Hydrogen_Bonds" \
-    "echo '1 1' | gmx hbond -s $TPR_FILE -f $XTC_FILE \
+    "gmx hbond -s $TPR_FILE -f $XTC_FILE \
+    -r 'group DNA' -t 'group DNA' \
     -num $ANALYSIS_DIR/hbnum.xvg -dist $ANALYSIS_DIR/hbdist.xvg \
-    -ang $ANALYSIS_DIR/hbangle.xvg -life $ANALYSIS_DIR/hblife.xvg \
+    -ang $ANALYSIS_DIR/hbangle.xvg \
     -b $SKIP"
 
 # ═══════════════════════════════════════════════════════════
 # ANALYSIS 5: Solvent Accessible Surface Area
 # ═══════════════════════════════════════════════════════════
+# NOTE: duplicate -o aborts gmx sasa; per-residue output is -or in 2025.3.
 run_analysis "SASA" \
     "echo '1' | gmx sasa -s $TPR_FILE -f $XTC_FILE \
-    -o $ANALYSIS_DIR/sasa.xvg -o $ANALYSIS_DIR/sasa_per_res.xvg \
+    -o $ANALYSIS_DIR/sasa.xvg -or $ANALYSIS_DIR/sasa_per_res.xvg \
     -tu ns -b $SKIP"
 
 # ═══════════════════════════════════════════════════════════
@@ -86,16 +95,17 @@ run_analysis "SASA" \
 echo ""
 echo "▶ Principal Component Analysis..."
 
-# Covariance matrix
-echo "4 4" | gmx covar -s $TPR_FILE -f $XTC_FILE \
+# Covariance matrix — group 1 (DNA). NOTE: -lpc was removed from
+# gmx covar (2025.3); eigenval.xvg + eigenvec.trr are the outputs used.
+echo "1 1" | gmx covar -s $TPR_FILE -f $XTC_FILE \
     -o $ANALYSIS_DIR/eigenval.xvg \
     -v $ANALYSIS_DIR/eigenvec.trr \
-    -lpc $ANALYSIS_DIR/lpc.xvg \
     -b $SKIP \
     > "$ANALYSIS_DIR/pca_covar.log" 2>&1 || true
 
-# Project trajectory onto first 2 PCs
-echo "4 4" | gmx anaeig -s $TPR_FILE -f $XTC_FILE \
+# Project trajectory onto first 2 PCs — group 1 (DNA). anaeig asks TWO
+# questions (fit group used by covar, then the eigenvector group).
+echo "1 1" | gmx anaeig -s $TPR_FILE -f $XTC_FILE \
     -v $ANALYSIS_DIR/eigenvec.trr \
     -first 1 -last 2 \
     -proj $ANALYSIS_DIR/proj.xvg \
@@ -107,10 +117,12 @@ echo "  ✓ PCA complete"
 # ═══════════════════════════════════════════════════════════
 # ANALYSIS 7: Clustering
 # ═══════════════════════════════════════════════════════════
+# Clustering on DNA (group 1). NOTE: gmx cluster -o accepts only .xpm
+# (matrix plot); the text log goes to -g and distances to -dist.
 run_analysis "Clustering" \
-    "echo '4 4' | gmx cluster -s $TPR_FILE -f $XTC_FILE \
+    "echo '1 1' | gmx cluster -s $TPR_FILE -f $XTC_FILE \
     -method gromos -cutoff 0.2 \
-    -o $ANALYSIS_DIR/clusters.xvg \
+    -o $ANALYSIS_DIR/clusters.xpm \
     -g $ANALYSIS_DIR/cluster.log \
     -dist $ANALYSIS_DIR/clustdist.xvg \
     -b $SKIP"
@@ -138,10 +150,11 @@ fi
 # ═══════════════════════════════════════════════════════════
 echo ""
 echo "▶ Base-pair analysis (Watson-Crick)..."
-echo "1 1" | gmx hbond -s $TPR_FILE -f $XTC_FILE \
+# DNA base-pair proxy: intramolecular DNA H-bonds (modern -r/-t syntax;
+# -life/-ghost/stdin-piping no longer exist in GROMACS 2024+).
+gmx hbond -s $TPR_FILE -f $XTC_FILE \
+    -r 'group DNA' -t 'group DNA' \
     -num $ANALYSIS_DIR/base_pairs.xvg \
-    -life $ANALYSIS_DIR/bp_lifetime.xvg \
-    -ghost \
     -b $SKIP \
     > "$ANALYSIS_DIR/basepair.log" 2>&1 || true
 echo "  ✓ Base-pair analysis complete"
@@ -161,7 +174,6 @@ echo "    $ANALYSIS_DIR/gyrate.xvg        (Radius of gyration)"
 echo ""
 echo "  Interaction metrics:"
 echo "    $ANALYSIS_DIR/hbnum.xvg         (H-bond count)"
-echo "    $ANALYSIS_DIR/hblife.xvg        (H-bond lifetime)"
 echo "    $ANALYSIS_DIR/base_pairs.xvg    (Base-pair count)"
 echo ""
 echo "  Solvent metrics:"
@@ -169,7 +181,8 @@ echo "    $ANALYSIS_DIR/sasa.xvg          (Total SASA)"
 echo ""
 echo "  Dynamics metrics:"
 echo "    $ANALYSIS_DIR/proj.xvg          (PCA projection)"
-echo "    $ANALYSIS_DIR/clusters.xvg      (Cluster analysis)"
+echo "    $ANALYSIS_DIR/clusters.xpm      (Cluster matrix)"
+echo "    $ANALYSIS_DIR/cluster.log      (Cluster sizes/occupancy)"
 echo ""
 echo "  Energy metrics:"
 echo "    $ANALYSIS_DIR/energy_Temperature.xvg"

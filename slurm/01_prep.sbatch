@@ -22,7 +22,9 @@
 #SBATCH --account=mst115368
 # (No GPU: ngs* GPU partitions are restricted, gpu-amd is down — CPU path)
 
-# ─── Environment Setup ────────────────────────────────────
+# >>> NA53_ENV_SETUP >>>
+# Environment Setup — this block is REPLACED by ./run_simulation.sh submit with
+# the active profile's ENV_SETUP. Direct sbatch runs use the defaults below.
 module purge
 module load gcc/13.2.0 2>/dev/null || module load gcc 2>/dev/null || true
 
@@ -30,6 +32,7 @@ module load gcc/13.2.0 2>/dev/null || module load gcc 2>/dev/null || true
 source "${HOME}/miniconda3/etc/profile.d/conda.sh" 2>/dev/null || \
 source "${HOME}/anaconda3/etc/profile.d/conda.sh" 2>/dev/null || true
 conda activate na53_aptamer 2>/dev/null || true
+# <<< NA53_ENV_SETUP <<<
 
 cd "${SLURM_SUBMIT_DIR}/../scripts" || cd scripts
 

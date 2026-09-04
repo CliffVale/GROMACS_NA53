@@ -60,28 +60,27 @@ echo "  ℹ  Monitor: tail -f $LOG_DIR/mdrun_prod.log"
 echo ""
 
 # Full explicit offload only when GPU requested; otherwise let mdrun decide
+# NOTE: -gpu_id (underscore) is the correct mdrun option in GROMACS 2021+;
+#       -gpu-id aborts with "Unknown command-line option".
 MD_ARGS="$GPU_FLAG"
 if [ "$GPU_FLAG" = "-nb gpu" ]; then
-    MD_ARGS="-nb gpu -pme gpu -bonded gpu -update gpu -gpu-id 0"
+    MD_ARGS="-nb gpu -pme gpu -bonded gpu -update gpu -gpu_id 0"
 fi
 
+# Foreground run (like every other stage script) so callers — including
+# run_simulation.sh start gates — only proceed after real completion.
+# To resume after an interruption:
+#   gmx mdrun -deffnm prod $GPU_FLAG -cpi prod.cpt
+#
+# Monitor progress from another shell:
+#   tail -f $LOG_DIR/mdrun_prod.log
+#   watch -n 30 'grep Performance prod.log | tail -1'
 gmx mdrun -deffnm prod $MD_ARGS -ntomp 4 \
     -cpo prod -cpt 900 \
-    > "$LOG_DIR/mdrun_prod.log" 2>&1 &
+    > "$LOG_DIR/mdrun_prod.log" 2>&1
 
-PROD_PID=$!
-echo "  ℹ  Production MD started (PID: $PROD_PID)"
-echo "  ℹ  To resume after interruption:"
-echo "      gmx mdrun -deffnm prod $GPU_FLAG -cpi prod.cpt"
-echo ""
-echo "  To monitor progress:"
-echo "      tail -f $LOG_DIR/mdrun_prod.log"
-echo "      watch -n 30 'grep Performance prod.log | tail -1'"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Production MD running in background (PID: $PROD_PID)"
-echo "  When complete, run: 04_analysis.sh"
+echo "  Production MD complete — run 04_analysis.sh next"
+echo "  Artifacts in scripts/: prod.tpr prod.xtc prod.cpt prod.log"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-# Wait for completion (optional — remove & from mdrun above for foreground)
-# wait $PROD_PID

@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-09-03 |
-| **Current phase** | Phase 4 (Environment) / Phase 5 (Structure) boundary |
+| **Last updated** | 2026-09-04 |
+| **Current phase** | Phase 4/5 — local 1 ns end-to-end trial PASSED; commit+push pending |
 
 > **Purpose:** the single source of truth for *what has been done, what is being
 > worked on, and what comes next*. Any AI resuming this project must read this
@@ -15,13 +15,14 @@
 ## 1. Project State (TL;DR)
 
 - ✅ Phases 0–3 complete: research, design decisions, trial-run analysis, and a
-  fully scaffolded, syntax-validated pipeline (scripts 00–05, MDP configs,
-  SLURM jobs, conda env, CI).
-- 🔵 Phase 4 (Taiwania 3 setup) is scripted and **mostly verified live**; the
-  env install itself still needs one run on the cluster.
-- ⬜ **Phase 5 is next**: obtain `structures/NA53_initial.pdb` — the one file
-  the pipeline will not fabricate.
-- ⏸ Nothing is blocked; the pipeline is ready to execute once the PDB exists.
+  fully scaffolded pipeline (scripts 00–05, MDP configs, SLURM jobs, conda env, CI).
+- ✅ **2026-09-04: local 1 ns end-to-end trial PASSED** through the launcher
+  (`local_gpu` profile, GTX 1650 Ti, substitute 1BNA PDB): prep → EM → NVT →
+  NPT → 1 ns prod (~5 min) → all 8 analyses → 8 figures. Zero warnings.
+- 🔵 Phase 4 (Taiwania 3 setup) scripted + mostly verified live; env install
+  still needs one run on the cluster.
+- ⬜ **Phase 5**: obtain the real `structures/NA53_initial.pdb` (NA53 sequence).
+- ⏸ Nothing blocked; trial-driven bug fixes below are staged for commit.
 
 ---
 
@@ -38,6 +39,14 @@
 | 2026-09-03 | Rebuilt all sbatch jobs for CPU conda-GROMACS path | slurm/*.sbatch |
 | 2026-09-03 | Fixed latent bugs: fake-PDB fallback, conda gmx shadowing, GPU demands | scripts/00, environment.yml |
 | 2026-09-03 | Created AI-reference layer: PRD, architecture, rules, phases, design, memory | root docs (this layer) |
+| 2026-09-04 | Imported the Research SOP (deep-search workflow) from the AI_setup env: spec, report template, references ledger, run log, helper scripts, and 2 seed reports (incl. founding NA53 litreview w/ Taiwania reconciliation banner) | research/ |
+| 2026-09-04 | Deep-analyzed the AI_setup folder; critical finding F1: its NCHC §4–§5 are Taiwania-2 (GPU) — this repo's slurm/configs are the verified Taiwania-3 truth | AI_setup/docs/DEEP_ANALYSIS.md |
+| 2026-09-04 | GPU platform research: **TWCC offline 2026-08-31**; T2 now commercial TWAI; recommend T3-GPU via iService (A100) as primary | docs/HPC_GPU_OPTIONS.md |
+| 2026-09-04 | Fixed chain-breaking bugs: 02_equil ionized lookup, 03_prod/04_analysis artifact mismatch (`../production` vs `scripts/`) → workspace standardized on `scripts/` | slurm/02,03,04 + scripts/run_pipeline.sh |
+| 2026-09-04 | Added profile system + clone-and-run launcher + remote monitoring | profiles/, run_simulation.sh |
+| 2026-09-04 | **Local 1 ns trial run exposed config-level bugs → fixed:** ions.mdp kept PME for the pre-neutralization grompp (net charge −22 → fatal); `POSRES_BB` macro never defined by pdb2gmx (→ unused-macro fatal) so NPT1 used plain `POSRES`; missing `refcoord_scaling = com` (PR + posres fatal); MDPs drifted from the locked standard (rcoulomb/rvdw 1.0 vs 0.8 nm, missing shift-Verlet) → unified all stages to the validated 0.8 nm pattern | configs/ions.mdp, nvt.mdp, npt.mdp, npt_free.mdp, prod.mdp |
+| 2026-09-04 | **Trial run, 2nd wave — production & analysis bugs → fixed:** `-gpu-id` invalid in mdrun 2021+ (→ `-gpu_id`); prod mdrun was backgrounded w/o wait → died on shell exit → foreground (all stages consistent); analysis group indices targeted group 4 = **Water** → group 1 = **DNA** for RMSD/RMSF/covar/anaeig/cluster; hbond rewritten in GROMACS 2024+ (stdin piping dead, `-life`/`-ghost` removed) → modern `-r 'group DNA' -t 'group DNA'` selections; sasa duplicate `-o` → `-o` + `-or`; covar `-lpc` removed (2025.3); anaeig needs 2 stdin answers (fit + eigenvector group); cluster `-o` requires `.xpm`; STATUS_FILE/JOBS_DIR anchored to repo root (was split across logs/ + scripts/logs/) | scripts/03_production.sh, scripts/04_analysis.sh, run_simulation.sh |
+| 2026-09-04 | **End-to-end trial re-run PASSED** (post-fix): 0 ⚠️, DNA H-bonds 30–38 (~30 WC bonds for 12 bp — sanity ✓), 1 ns in ~5 min GPU | analysis/, results/figures/ (gitignored, kept locally) |
 
 ## 3. Files — Current Ownership & Status
 
@@ -77,10 +86,35 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | `03_prod.sbatch` | ✅ ready | RESTART=1 resume path |
 | `04_analysis.sbatch` | ✅ ready | 8 cores |
 
-### 3.5 Currently being worked on
-- **Nothing is mid-edit.** Last session closed with all files validated.
-- Next edit is expected in **Phase 4** (setup run on cluster) or **Phase 5**
-  (adding the PDB + any AptaFold glue).
+### 3.5 Research SOP (imported 2026-09-04)
+| File | Status | Notes |
+|---|---|---|
+| `research/README.md` | ✅ | SOP index |
+| `research/WORKFLOW.md` | ✅ | adapted paths (`research/scripts/`, `research/deepsearch.log`) |
+| `research/REPORT-TEMPLATE.md` | ✅ | verbatim |
+| `research/REFERENCES.md` | ✅ | provenance note added |
+| `research/deepsearch.log` | ✅ | 5 historical runs (2026-09-03); tracked via gitignore negation |
+| `research/scripts/s2_search.py` | ✅ | paths adapted; stdlib-only, keyless |
+| `research/scripts/log_run.py` | ✅ | now appends to `research/deepsearch.log` |
+| `research/reports/2026-09-03-ngal-na53-gromacs-litreview.md` | ✅ | **founding review** + F1/F2 reconciliation banner |
+| `research/reports/2026-09-03-aptamer-biosensor-deepsearch.md` | ✅ | toolchain survey |
+
+### 3.6 Launcher & profiles (added 2026-09-04)
+| File | Status | Notes |
+|---|---|---|
+| `run_simulation.sh` | ✅ | profile detect, start (interactive chain + gates), submit (generates jobs, afterok chain), status, monitor (local + SSH); `--dry-run` tested |
+| `profiles/README.md` | ✅ | variable contract + auto-detect table |
+| `profiles/taiwania3_cpu.env` | ✅ | VERIFIED ct56/mst115368/conda env |
+| `profiles/taiwania3_gpu.env` | ⚠️ template | PARTITION/GRES/ENV_SETUP = CHANGE_ME; engine must be CUDA-enabled (conda gmx is CPU-only) |
+| `profiles/taiwania2_twai_gpu.env` | ⚠️ template | TWAI (T2 commercial V100) |
+| `profiles/local_gpu.env` | ✅ | GTX 1650 Ti, full offload, PROD_NS=20 dev default |
+| `docs/HPC_GPU_OPTIONS.md` | ✅ | platform evidence + §5 on-node checklist |
+
+### 3.7 Currently being worked on
+- **Session complete** — next edit is the pending **commit + push** of:
+  research/, profiles/, run_simulation.sh, docs/HPC_GPU_OPTIONS.md +
+  modified configs/scripts/slurm/.gitignore/README/architecture/memory + CI.
+- After that: Phase 4 (cluster setup run) and Phase 5 (real NA53 PDB).
 
 ---
 
@@ -110,6 +144,11 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | Production restraints | none | trial lesson |
 | Checkpoint | `-cpo prod -cpt 900` | disconnect lesson |
 | Expected rate (NA53 on ct56) | ~40–70 ns/day (est.) | scaled from 1BNA 257 ns/day |
+| Local engine (verified 09-04) | gmx 2025.3 GPU build at `~/gromacs-2025.3/build/bin` | trial runs |
+| Local GPU mdrun flags | `-nb gpu -pme gpu -bonded gpu -update gpu -gpu_id 0` — **`-gpu_id`** (underscore), not `-gpu-id` | `gmx mdrun -h` on 2025.3 |
+| Local measured rate | 1 ns in ~5 min on GTX 1650 Ti (~66k atoms system) | trial log 09-04 |
+| pdb2gmx index layout (DNA+NaCl+water) | 0 System, **1 DNA**, 2 NA, 3 CL, 4 Water, 5 SOL, 6 non-Water, 7 Ion | `gmx make_ndx` on trial tpr |
+| gmx hbond (2024+) | selections via `-r`/`-t` CLI; `-life`/`-ghost`/stdin-piping gone | `gmx hbond -h` 2025.3 |
 
 ---
 
@@ -124,20 +163,30 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | D5 | 09-03 | No fabrication of PDB; external model required | pdb2gmx needs complete residues | no (hard rule) |
 | D6 | 09-03 | Restraints removed from production | froze DNA in trials | yes |
 | D7 | 09-03 | 0.8 nm cutoff locked | correct for AMBER FF | yes (w/ evidence) |
+| D8 | 09-04 | Stage artifacts colocate in `scripts/` (both interactive + SLURM) | kills the `../production` vs `scripts/` chain mismatch | yes (bigger refactor later) |
+| D9 | 09-04 | GPU strategy: request T3-GPU via iService first; TWAI T2 fallback; TWCC dead | TWCC shutdown 2026-08-31; T3 = same account/infra | yes |
 
 ---
 
 ## 6. Next Actions (priority order)
 
-1. **User:** create GitHub repo `GROMACS_NA53` (or rename existing) and push this
-   folder (commands in README §Deployment).
+1. **Agent:** commit + push this session's work (Research SOP + GPU analysis +
+   launcher/profiles + consistency fixes + **trial-driven prod/analysis/config
+   fixes**) — repo `CliffVale/GROMACS_NA53` exists. `.gitignore` now excludes
+   generated analysis/ + results/; trial junk already cleaned.
 2. **User/Agent:** run Phase 4 on Taiwania 3: `bash slurm/setup_taiwania3.sh
-   <repo-url>`, `conda activate na53_aptamer`, `gmx --version` → expect 2024.4.
-3. **Agent (Phase 5):** generate `structures/NA53_initial.pdb` via AptaFold or
+   <repo-url>`, `conda activate na53_aptamer`, `gmx --version` → expect 2024.4,
+   then `./run_simulation.sh submit --profile taiwania3_cpu`.
+3. **User:** request GPU access on T3 via iService (see docs/HPC_GPU_OPTIONS.md);
+   when granted, run the §5 checklist and paste back → fill `taiwania3_gpu.env`.
+4. **Agent (Phase 5):** generate `structures/NA53_initial.pdb` via AptaFold or
    w3DNA; validate with `bash scripts/00_predict_structure.sh`.
-4. **Agent (Phase 6+):** `sbatch slurm/01_prep.sbatch` → `02_equil` → `03_prod`
-   → `04_analysis`, checking gates between stages.
-5. **Agent:** after each stage, update this file's §2/§3/§6.
+5. **Agent (Phase 6+):** submit the chain and gate each stage
+   (`./run_simulation.sh status` between jobs).
+6. **Agent:** after each stage, update this file's §2/§3/§6.
+7. **Agent:** next research task goes through `research/WORKFLOW.md` (new report
+   in `research/reports/`, sources in `REFERENCES.md`, one line in
+   `research/deepsearch.log`).
 
 ---
 
@@ -150,6 +199,7 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 | Q3 | Is 100 ns enough for convergence, or extend to 300–500 ns? | agent (Phase 9 data) | Phase 8 |
 | Q4 | INF/DSSR analysis worth installing for publication? | user | Phase 9 |
 | Q5 | Cluster rep structures → docking (AutoDock/HADDOCK)? | user | Phase 10 |
+| Q6 | Will NCHC grant/rent GPU to mst115368 on T3 (gpu-amd A100)? | user | Phase 3/4 |
 
 ---
 

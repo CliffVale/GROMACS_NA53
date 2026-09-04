@@ -21,13 +21,15 @@
 #SBATCH --partition=ct56
 #SBATCH --account=mst115368
 
-# ─── Environment Setup ────────────────────────────────────
+# >>> NA53_ENV_SETUP >>>
+# Environment Setup — replaced by ./run_simulation.sh submit (profile ENV_SETUP)
 module purge
 module load gcc/13.2.0 2>/dev/null || module load gcc 2>/dev/null || true
 
 source "${HOME}/miniconda3/etc/profile.d/conda.sh" 2>/dev/null || \
 source "${HOME}/anaconda3/etc/profile.d/conda.sh" 2>/dev/null || true
 conda activate na53_aptamer 2>/dev/null || true
+# <<< NA53_ENV_SETUP <<<
 
 cd "${SLURM_SUBMIT_DIR}/../scripts" || cd scripts
 
@@ -36,8 +38,8 @@ echo "Node:   $SLURM_NODELIST"
 echo "Start:  $(date)"
 gmx --version 2>&1 | head -1
 
-# Find ionized gro file
-IONIZED_GRO=$(ls ../system/*_ionized.gro ../*_ionized.gro 2>/dev/null | head -1)
+# Find ionized gro file (stage scripts colocate artifacts in scripts/)
+IONIZED_GRO=$(ls *_ionized.gro ../system/*_ionized.gro 2>/dev/null | head -1)
 if [ -z "$IONIZED_GRO" ]; then
     echo "❌ ERROR: No _ionized.gro found. Run 01_prep.sbatch first."
     exit 1

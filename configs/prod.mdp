@@ -24,8 +24,9 @@ lincs_order     = 4
 cutoff-scheme   = Verlet
 ns_type         = grid
 nstlist         = 10
-rcoulomb        = 1.0
-rvdw            = 1.0
+rcoulomb        = 0.8           ; ✅ VALIDATED: 0.8 nm (200 ns 1BNA run)
+rvdw            = 0.8           ; ✅ VALIDATED: 0.8 nm
+vdw-modifier    = Potential-shift-Verlet  ; ✅ REQUIRED for AMBER
 
 ; Electrostatics
 coulombtype     = PME
@@ -34,7 +35,7 @@ fourierspacing  = 0.12
 
 ; Van der Waals
 vdwtype         = Cut-off
-DispCorr        = EnerPres
+DispCorr        = EnerPres     ; ✅ REQUIRED: Dispersion correction
 
 ; Temperature coupling — VALIDATED from GROMACS_TEEP
 tcoupl          = V-rescale     ; ✅ VALIDATED: V-rescale

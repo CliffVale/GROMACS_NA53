@@ -51,6 +51,7 @@ GROMACS_NA53/
 ├── design.md                   # ← AI record: visual identity
 ├── memory.md                   # ← AI record: live status
 ├── README.md                   # Public entry point
+├── run_simulation.sh           # clone-and-run launcher (start/submit/status/monitor)
 ├── environment.yml             # conda env: gromacs 2024.4 CPU + analysis tools
 ├── .gitignore                  # excludes .gro/.xtc/.tpr/etc.
 ├── .github/workflows/validate.yml  # CI: bash -n + py syntax
@@ -65,6 +66,12 @@ GROMACS_NA53/
 │   ├── APTAMD_DEEP_ANALYSIS.md
 │   ├── LESSONS_LEARNED_FROM_TRIAL_RUNS.md
 │   └── TRANSCRIPTS_DEEP_ANALYSIS.md
+│
+├── profiles/                   # machine profiles — see profiles/README.md
+│   ├── taiwania3_cpu.env       # ✅ verified (ct56, conda gromacs 2024.4)
+│   ├── taiwania3_gpu.env       # ⚠️ template (A100/Tesla partitions)
+│   ├── taiwania2_twai_gpu.env  # ⚠️ template (TWAI V100)
+│   └── local_gpu.env           # workstation GPU
 │
 ├── configs/                    # MDP files (verified parameters)
 │   ├── em.mdp  nvt.mdp  npt.mdp  npt_free.mdp  prod.mdp  ions.mdp
@@ -88,6 +95,14 @@ GROMACS_NA53/
 │   └── 04_analysis.sbatch
 │
 ├── templates/posre.itp         # positional restraints template
+├── research/                   # Research SOP — deep-search workflow
+│   ├── README.md               # SOP index
+│   ├── WORKFLOW.md             # frame → search → verify → synthesize → log
+│   ├── REPORT-TEMPLATE.md      # evidence-report scaffold
+│   ├── REFERENCES.md           # ledger of actually-used sources
+│   ├── deepsearch.log          # JSONL run log (tracked)
+│   ├── reports/                # completed research reports
+│   └── scripts/                # s2_search.py, log_run.py
 ├── structures/                 # INPUT PDB (the one file you must provide)
 ├── system/                     # processed/boxed/solvated/ionized
 ├── equilibration/              # em/nvt/npt outputs
@@ -137,6 +152,24 @@ sbatch slurm/04_analysis.sbatch
 ```bash
 RESTART=1 sbatch slurm/03_prod.sbatch   # gmx mdrun -cpi prod.cpt
 ```
+
+### 5.4 Profile launcher (recommended entry point — 2026-09-04)
+`run_simulation.sh` is a machine-aware wrapper over modes 5.1–5.3. It reads a
+profile (`profiles/*.env`) that carries the engine setup, GPU flags, SLURM queue
+values, and optional SSH target for remote monitoring:
+
+| Command | What it does |
+|---|---|
+| `./run_simulation.sh profile` | show / set the active profile (hostname auto-detect: `lgn*` → `taiwania3_cpu`) |
+| `./run_simulation.sh env` | print the engine-setup snippet for manual shells |
+| `./run_simulation.sh start [--ns N] [--stage …]` | interactive chain (workstation): 00→01→02→03→04 with file gates + `logs/run_status.txt` |
+| `./run_simulation.sh submit [--dry-run]` | generate `slurm/jobs/*_<profile>.sbatch` from the verified templates (patch partition/account/time/cpus/mem/±`--gres`, swap the env block) and submit 01→04 with `afterok` dependencies |
+| `./run_simulation.sh status/monitor` | local snapshot/live-follow, or over SSH when the profile has `SSH_HOST` |
+
+**Workspace convention:** all stage scripts execute from `scripts/`, so the stage
+artifacts (`topol.top`, `*_ionized.gro`, `npt2.gro`, `prod.*`) colocate in
+`scripts/` for both interactive and SLURM runs (fixed 2026-09-04 — previously the
+SLURM prod job wrote to `../production/` while analysis read from `scripts/`).
 
 ## 6. Key Design Decisions (traceable)
 

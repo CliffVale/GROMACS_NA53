@@ -5,8 +5,11 @@
 # into this env (two binaries would shadow each other).
 name: na53_aptamer
 channels:
+  # INCIDENT 2026-09-04: `defaults` was listed here and conda 25.x blocks it
+  # behind an interactive ToS gate (CondaToSNonInteractiveError) on the login
+  # node. Every package below exists on conda-forge, so the env is now pure
+  # conda-forge — no ToS gate, no licensing surface.
   - conda-forge
-  - defaults
 dependencies:
   - python=3.10
   - gromacs=2024.4

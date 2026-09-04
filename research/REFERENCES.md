@@ -1,5 +1,10 @@
 # References Ledger — legitimately used sources
 
+> **Master register:** the complete audited source list for the whole pipeline
+> (literature + software + cluster + corrections) lives in
+> [`docs/REFERENCES.md`](../docs/REFERENCES.md). This ledger is the research-run
+> working log that feeds it — keep both in sync.
+
 Only sources **actually opened and used** during a deep search run belong here.
 Each entry records which run it came from. Never add a source that was not consulted.
 

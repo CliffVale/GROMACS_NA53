@@ -321,4 +321,43 @@ done
 
 ---
 
-*Generated: 2026-09-02 | Project: GROMACS_NA53*
+## 8. Implemented: Unified Health Reporting (2026-09-04)
+
+§5.2 and §7 sketch manual scripts; the **implemented** flow replaces them:
+
+| Piece | What it does | Where
+|---|---|---|
+| `scripts/health_report.sh` | One compact report, one vocabulary (✅ PASS / ⚠️ WARN / ❌ FAIL) across **H1 engine · H2 repo integrity · H3 gmx compat · H4 run KPIs** | `status`/`monitor`, local + remote |
+| `scripts/check_repo_integrity.sh` | H2 — static repo health (files shipped, exec bits, MDP standard, placeholders) | CI on every push + H2 |
+| `scripts/probe_gmx_compat.sh` | H3 — live probes of the gmx build (same flags `doctor` checks) | H3 |
+| `./run_simulation.sh doctor` | Pre-run gate: H2 + H3 (+ group-layout G1) | before first start/submit |
+
+### 8.1 KPI table → implementation map
+
+| KPI table (above) | Implemented by | When |
+|---|---|---|
+| §2 Performance (ns/day) | H4 `ns/day` — measured from the `Performance:` line (finished) or estimated from log age (running) | every status/monitor |
+| §2 Wall-clock/GPU | H4 sim-time + log-freshness; GPU via `nvidia-smi` on the node (manual) | during prod |
+| §3 Thermodynamic | `gmx energy` in `04_analysis.sh` (energy_*.xvg → figures) | post-run |
+| §4 Structural (RMSD/Rg/H-bonds/SASA) | `04_analysis.sh` → `05_visualization.py` (`summary_dashboard.png`) | post-run |
+| Storage / budget | `docs/05_BUDGET_TRACKER.md` ledger | per run |
+
+### 8.2 Calling the health report
+
+```bash
+# one-shot snapshot (what ./run_simulation.sh status now prints):
+bash scripts/health_report.sh --profile taiwania3_cpu --quiet-integrity
+
+# live monitoring (health block, then md log follow) — same on the cluster via SSH:
+./run_simulation.sh status --profile taiwania3_cpu
+./run_simulation.sh monitor --once --profile taiwania3_cpu
+```
+
+**Exit code:** 0 = healthy; 1 = a ❌ in H2/H3 — do not start/continue stages until fixed.
+The stale-log rule: a live (not finished) mdrun whose log is untouched for > 600 s is
+flagged ⚠️ as a possible hang. `doctor` stays the pre-flight gate; `status`/`monitor`
+report the same signals *during* the run, on any machine.
+
+---
+
+*Generated: 2026-09-02 (rev. 2026-09-04: §8 unified health reporting) | Project: GROMACS_NA53*

@@ -68,8 +68,11 @@ bash slurm/setup_taiwania3.sh https://github.com/CliffVale/GROMACS_NA53.git
 ./run_simulation.sh profile --set taiwania3_cpu
 ./run_simulation.sh doctor                             # pre-flight: static checks + live gmx probes
 ./run_simulation.sh submit --profile taiwania3_cpu      # chain 01→02→03→04 (afterok deps)
-./run_simulation.sh status                             # snapshot (squeue + status + log tail)
-./run_simulation.sh monitor                           # live follow from THIS machine (OTP prompt)
+./run_simulation.sh status                             # snapshot: squeue + status + HEALTH report + log tail
+./run_simulation.sh monitor                           # HEALTH report + live follow from THIS machine (OTP prompt)
+#   status/monitor embed scripts/health_report.sh (H1 engine · H2 repo integrity ·
+#   H3 gmx compat · H4 run KPIs: sim time, ns/day, log freshness) — same ✅/⚠️/❌
+#   vocabulary as `doctor`, locally and on the cluster (docs/06_KPI_DASHBOARD.md §8)
 
 # ── GPU machine (after GPU access is granted) ──────────────
 # 1. read docs/HPC_GPU_OPTIONS.md (TWCC is offline; T3-GPU or TWAI T2 are the paths)
@@ -366,14 +369,18 @@ bash scripts/install_dependencies.sh
 
 ## 📚 References
 
+> Full audited register with URLs, usage notes, and verification status for
+> every source: **[`docs/REFERENCES.md`](docs/REFERENCES.md)** (master). The rows
+> below are the paper-level highlights.
+
 | # | Citation |
 |---|----------|
 | 1 | E2EDNA: Kilgour et al. *JCIM* 2021, 61, 4139 |
-| 2 | AMBER99bsc1: Zgarbová et al. *JCTC* 2011, 7, 2886 |
+| 2 | AMBER DNA backbone refinement (bsc0): Zgarbová et al. *JCTC* 2011, 7, 2886, DOI 10.1021/ct200326x · bsc1: Ivani et al. *Nat Methods* 2016, 13, 55, DOI 10.1038/nmeth.3658 |
 | 3 | Aptamer–ligand MD: Rodríguez Serrano et al. *JCISD* 2022, 62, 4799 |
-| 4 | Aptamer truncation: Díaz-Fernández et al. *ChemRxiv* 2025 |
+| 4 | Aptamer truncation via MD: Díaz-Fernández et al. *ChemRxiv* 2025, DOI 10.26434/chemrxiv-2025-k5mzk |
 | 5 | GROMACS: Abraham et al. *SoftwareX* 2015, 1–2, 19 |
-| 6 | CHAPERONg: Yekeen et al. *GigaScience* 2023 |
+| 6 | CHAPERONg: Yekeen et al. *Comput Struct Biotechnol J* 2023, DOI 10.1016/j.csbj.2023.09.024 |
 
 ---
 

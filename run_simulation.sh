@@ -12,8 +12,10 @@
 #   ./run_simulation.sh doctor [--profile NAME]        # pre-run health check (static + live gmx probes)
 #   ./run_simulation.sh start  [--profile NAME] [--ns N] [--stage all|prep|equil|prod|analysis] [--pdb FILE]
 #   ./run_simulation.sh submit [--profile NAME] [--ns N] [--dry-run]
-#   ./run_simulation.sh status [--profile NAME] [--local]
-#   ./run_simulation.sh monitor [--profile NAME] [--once]
+#   ./run_simulation.sh status [--profile NAME] [--local]   # snapshot incl. health report (H1-H4)
+#   ./run_simulation.sh monitor [--profile NAME] [--once]    # health report + live md log tail
+#   (status & monitor run scripts/health_report.sh — doctor-style ✅/⚠️/❌ —
+#    locally AND over SSH, so cluster jobs report health the same way)
 #
 # Profiles live in profiles/*.env — see profiles/README.md.
 # Postmortem + prevention map: docs/INCIDENT_ANALYSIS.md.
@@ -323,11 +325,14 @@ remote_cd() { # remote working directory (expand $HOME on the REMOTE side)
     else echo "cd \${HOME}/${REMOTE_DIR:-GROMACS_NA53}"; fi
 }
 
+# remote_snapshot PROFILE — same report shape as the local status path, so the
+# cluster reports health with the same vocabulary (scripts/health_report.sh).
 remote_snapshot() {
-    local dest rcd
+    local dest rcd rprof
     dest=$(remote_dest) || true
     [ -n "$dest" ] || return 1
     rcd=$(remote_cd)
+    rprof="${1:-}"
     # shellcheck disable=SC2029
     ssh -o ConnectTimeout=15 "$dest" "
         set -e
@@ -336,6 +341,8 @@ remote_snapshot() {
         squeue -u \$(whoami) 2>/dev/null || true
         echo '── run status ──'
         tail -n 8 logs/run_status.txt 2>/dev/null || echo '(no run_status.txt yet)'
+        echo '── health report (same as local status) ──'
+        bash scripts/health_report.sh ${rprof:+--profile $rprof} --quiet-integrity 2>&1 || true
         echo '── latest md log tail ──'
         f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); [ -n \"\$f\" ] && tail -n 12 \"\$f\" || echo '(no md log yet)'
     "
@@ -351,13 +358,15 @@ cmd_status() {
     if [ "$force_local" = "0" ] && remote_dest >/dev/null 2>&1 \
        && [ "$(hostname)" != "${SSH_HOST}" ] && [ "${SSH_HOST}" != "localhost" ]; then
         echo "Machine: remote (${SSH_HOST}) — fetching snapshot (2FA OTP may prompt)…"
-        remote_snapshot
+        remote_snapshot "$PROFILE_NAME_CUR"
     else
         echo "Machine: local"
         echo "── run status ──"
         [ -f "$STATUS_FILE" ] && tail -n 10 "$STATUS_FILE" || echo "(no run_status.txt yet)"
         echo "── SLURM (me) ──"
         command -v squeue >/dev/null 2>&1 && squeue -u "$USER" 2>/dev/null || echo "(no squeue here)"
+        echo "── health report (doctor vocabulary: ✅/⚠️/❌) ──"
+        bash scripts/health_report.sh --profile "$PROFILE_NAME_CUR" --quiet-integrity || true
         echo "── latest md log tail ──"
         local f; f=$(ls -t logs/mdrun_*.log 2>/dev/null | head -1 || true)
         [ -n "$f" ] && tail -n 12 "$f" || echo "(no md log yet)"
@@ -374,15 +383,19 @@ cmd_monitor() {
         echo "Monitoring remote $SSH_HOST — Ctrl-C to stop."
         echo "NOTE: Taiwania 3 requires 2FA — you will be asked for an OTP."
         local dest; dest=$(remote_dest); local rcd; rcd=$(remote_cd)
+        local hr="bash scripts/health_report.sh --profile $PROFILE_NAME_CUR --quiet-integrity 2>&1 || true"
         if [ "$once" = "1" ]; then
             # shellcheck disable=SC2029
-            ssh -t "$dest" "${rcd}; echo '── SLURM ──'; squeue -u \$(whoami); f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); echo '── \$f ──'; tail -n 25 \"\$f\" 2>/dev/null || true"
+            ssh -t "$dest" "${rcd}; echo '── health report ──'; ${hr}; echo '── SLURM ──'; squeue -u \$(whoami); f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); echo '── \$f ──'; tail -n 25 \"\$f\" 2>/dev/null || true"
         else
             # shellcheck disable=SC2029
-            ssh -t "$dest" "${rcd}; echo '── SLURM ──'; squeue -u \$(whoami); f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); echo \"── tail -f \\\$f ──\"; tail -f \"\$f\" 2>/dev/null || tail -f logs/*.out"
+            ssh -t "$dest" "${rcd}; echo '── health report ──'; ${hr}; echo '── SLURM ──'; squeue -u \$(whoami); f=\$(ls -t logs/mdrun_*.log 2>/dev/null | head -1); echo \"── tail -f \\\$f ──\"; tail -f \"\$f\" 2>/dev/null || tail -f logs/*.out"
         fi
     else
         echo "Monitoring local run — Ctrl-C to stop."
+        echo "── health report ──"
+        bash scripts/health_report.sh --profile "$PROFILE_NAME_CUR" --quiet-integrity || true
+        echo "── live md log tail (Ctrl-C to stop) ──"
         local f; f=$(ls -t logs/mdrun_*.log 2>/dev/null | head -1 || true)
         [ -n "$f" ] && tail -n 20 "$f" || echo "(no md log yet — run ./run_simulation.sh start)"
         [ "$once" = "1" ] && return
@@ -419,45 +432,13 @@ cmd_doctor() {
         echo "  ❌ gmx not found after profile ENV_SETUP — run './run_simulation.sh env'"
         return 1
     fi
-    gmx --version 2>/dev/null | head -1 | sed 's/^/  ✅ /'
-    # grep -c reads the full stream (no early-exit SIGPIPE under pipefail) and
-    # gmx prints -h help to STDERR, so 2>&1 is required — see docs/INCIDENT_ANALYSIS.md S2
-    probe_flag() { # label, gmx -h command, expected token
-        local hits
-        hits=$(eval "$2" 2>&1 | grep -cE -- "$3" || true)
-        if [ "${hits:-0}" -gt 0 ]; then
-            echo "  ✅ $1"
-        else
-            echo "  ❌ $1 — missing on this build; see docs/INCIDENT_ANALYSIS.md class V"
-            failed=1
-        fi
-    }
-    probe_flag "mdrun  -gpu_id (V1)"        "gmx mdrun -h"            "-gpu_id"
-    probe_flag "hbond  -r selection (V5)"   "gmx hbond -h"            "-r <selection>"
-    probe_flag "hbond  -t selection (V5)"   "gmx hbond -h"            "-t <selection>"
-    probe_flag "sasa   -or per-residue (V4)" "gmx sasa -h"            "-or "
-    probe_flag "cluster -o accepts .xpm only (V6)" "gmx cluster -h"     "<.xpm>"
-
-    echo ""
-    echo "▶ 3/3  Group-layout sanity (G1)"
-    local gro=""
-    gro=$(ls -t scripts/*_ionized.gro 2>/dev/null | head -1)
-    if [ -n "$gro" ]; then
-        local hits
-        hits=$(printf 'q\n' | gmx make_ndx -f "$gro" -o /dev/null 2>&1 | grep -cE "^ *1 DNA " || true)
-        if [ "${hits:-0}" -gt 0 ]; then
-            echo "  ✅ index group 1 = DNA on $gro (04_analysis.sh targets this)"
-        else
-            echo "  ❌ index group 1 is NOT 'DNA' on $gro — analysis would target the wrong molecule; fix 04_analysis.sh group indices"
-            failed=1
-        fi
-    else
-        echo "  ⚠️  no ionized structure yet — group check runs once prep is done (run: ./run_simulation.sh start --stage prep)"
-    fi
+    # Live probes live in the shared script so status/monitor health reporting
+    # checks the exact same flags (docs/INCIDENT_ANALYSIS.md class V/G).
+    bash scripts/probe_gmx_compat.sh || failed=1
 
     echo ""
     if [ "$failed" -gt 0 ]; then
-        echo "❌ doctor: $failed check(s) FAILED — do not start stages yet"
+        echo "❌ doctor: check(s) FAILED — do not start stages yet"
         echo "   See docs/INCIDENT_ANALYSIS.md (bug classes V/P/S/G/K + fixes)."
         return 1
     fi

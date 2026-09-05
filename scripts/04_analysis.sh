@@ -12,6 +12,14 @@
 
 set -euo pipefail
 
+# gmx must be on PATH — fail loudly instead of every tool silently failing
+# (e.g. running from the base conda env without gmx installed).
+if ! command -v gmx >/dev/null 2>&1; then
+    echo "❌ ERROR: gmx not found on PATH — activate the conda env first:"
+    echo "   conda activate na53_aptamer"
+    exit 1
+fi
+
 # ─── Configuration ────────────────────────────────────────
 PROD_PREFIX="${1:-prod}"
 SKIP="${2:-0}"                  # Skip first N ps (for equilibration)

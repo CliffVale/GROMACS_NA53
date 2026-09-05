@@ -133,7 +133,10 @@ run_analysis "Clustering" \
 echo ""
 echo "▶ Extracting energy terms..."
 if [ -f "${PROD_PREFIX}.edr" ]; then
-    for term in "15:Temperature" "23:Pressure" "24:Density" "10:Potential" "21:Conserved-En"; do
+    # gmx 2024.x energy term IDs (gmx energy list): 15 Temperature,
+    # 17 Pressure, 36 Density, 11 Potential, 14 Conserved En. Older IDs
+    # (23/24/10/21) silently pulled virial components + Coul. recip.
+    for term in "15:Temperature" "17:Pressure" "36:Density" "11:Potential" "14:Conserved-En"; do
         ID=$(echo $term | cut -d: -f1)
         NAME=$(echo $term | cut -d: -f2)
         echo "$ID" | gmx energy -f ${PROD_PREFIX}.edr \

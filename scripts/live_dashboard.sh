@@ -434,15 +434,17 @@ render() {
     else
         echo "    ${C_D}(no T/P in the log table yet)${C_0}"
     fi
-    # Mean pressure from the analysis xvg (available once analysis has run).
-    # This is the quantity that matters for equilibration quality.
-    if [ -n "$stage" ] && [ "$stage" != "em" ] && [ -f analysis/energy_Pressure.xvg ]; then
+    # Mean pressure from the analysis xvg — only show once analysis has
+    # actually completed for THIS prod run (ana_done=1). Before that, any
+    # xvg on disk is stale data from a previous run (e.g. the smoke's
+    # wrong-energy-ID era, where mean P was 988 bar instead of ~1 bar).
+    if [ "$ana_done" = 1 ] && [ -f analysis/energy_Pressure.xvg ]; then
         local pmean pmin pmax
         read -r pmean pmin pmax <<< "$(awk '/^ *[0-9]/ && NF>=2 {
             s+=$2; n++; if(min==""||$2<min) min=$2; if(max==""||$2>max) max=$2
         } END { if(n>0) printf "%.2f %.2f %.2f", s/n, min, max }' analysis/energy_Pressure.xvg 2>/dev/null)"
         if [ -n "$pmean" ]; then
-            echo "    mean P = ${C_B}${pmean}${C_0} bar  (range ${pmin}..${pmax} · from energy_Pressure.xvg)"
+            echo "    mean P = ${C_B}${pmean}${C_0} bar  (range ${pmin}..${pmax} · from energy_Pressure.xvg · this run's analysis)"
         fi
     fi
 

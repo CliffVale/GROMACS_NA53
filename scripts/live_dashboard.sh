@@ -191,11 +191,23 @@ parse_log() { # $1=stage → sets total_steps total_ps cur_step cur_ps temp
 
 stage_icon() { # $1 done(0/1)  $2 active-stage  $3 stage-family
     local done=$1 stg=${2:-} fam=${3:-}
-    if [ "$done" = "1" ]; then printf '%s✅ done%s' "$C_G" "$C_0"
-    elif [ "$fam" = "$stg" ]; then printf '%s▶ active%s' "$C_Y" "$C_0"
+    # Prevent the pipeline table from lying while a later stage is still
+    # running: if prod is active, analysis must show ◑ in-flight, not ✅ done
+    # even when stale figures exist on disk. A stale xtg on disk with prod
+    # not finished means the figures are from a PREVIOUS run.
+    if [ "$done" = "1" ]; then
+        printf '%s✅ done%s' "$C_G" "$C_0"
+    elif [ "$fam" = "$stg" ]; then
+        printf '%s▶ active%s' "$C_Y" "$C_0"
     elif [ "$fam" = "equil" ] && { [ "$stg" = "em" ] || [ "$stg" = "nvt" ] \
            || [ "$stg" = "npt1" ] || [ "$stg" = "npt2" ]; }; then
         printf '%s▶ active%s' "$C_Y" "$C_0"
+    elif [ "$fam" = "analysis" ] && [ "$stg" = "prod" ]; then
+        # prod is the active stage → analysis has not started yet
+        printf '%s○ not started%s' "$C_D" "$C_0"
+    elif [ "$fam" = "analysis" ] && [ -n "$stg" ]; then
+        # some other stage is active and we know analysis hasn't fired yet
+        printf '%s○ pending%s' "$C_D" "$C_0"
     else
         printf '%s○ pending%s' "$C_D" "$C_0"
     fi
@@ -245,8 +257,24 @@ render() {
     # gmx log) — a partial prod.xtc/npt2.gro is NOT done
     grep -q "Finished mdrun" scripts/npt2.log 2>/dev/null && equil_done=1
     grep -q "Finished mdrun" scripts/prod.log 2>/dev/null && prod_done=1
+    # analysis_done is ONLY set when analysis has definitively run to
+    # completion AND prod is done. Stale figures on disk with prod not
+    # finished are from a PREVIOUS run and must not be reported as done.
     n_figs=$(ls results/figures/*.png 2>/dev/null | wc -l)
-    [ "$n_figs" -gt 0 ] && ana_done=1
+    if [ "$n_figs" -gt 0 ] && [ "$prod_done" = 1 ]; then
+        ana_done=1
+    fi
+
+    # Sanity cross-check: figures/file counts that imply analysis ran but
+    # prod is NOT finished are incoherent with the SLURM job graph. Flag
+    # them rather than silently showing "✅ done".
+    if [ "$n_figs" -gt 0 ] && [ "$prod_done" != 1 ]; then
+        # figures on disk but prod not finished → stale data (prior run or
+        # partial prod). This is incoherent with a healthy current run.
+        st="⚠️  stale figures on disk — prod not finished and no job running; "
+        st="${st}do NOT read these as current results"
+        stc="$C_Y"
+    fi
 
     # ── progress bar ──
     if [ -n "$total_ps" ] && [ -n "$cur_ps" ] && awk -v a="$total_ps" 'BEGIN{exit !(a>0)}'; then
@@ -397,8 +425,14 @@ render() {
          "${C_D}npt2.gro $(fmt_bytes "$(stat -c %s scripts/npt2.gro 2>/dev/null || echo 0)")${C_0}"
     echo "    03 prod      $(stage_icon "$prod_done" "$stage" prod)" \
          "${C_D}target ${TARGET_NS} ns · xtc $(fmt_bytes "$(stat -c %s scripts/prod.xtc 2>/dev/null || echo 0)")${C_0}"
+    local ana_label="${n_figs} figure(s)"
+    if [ "$ana_done" = 1 ]; then
+        : # figures are current (prod done + figures exist)
+    elif [ "$n_figs" -gt 0 ]; then
+        ana_label="${n_figs} figure(s) ◑ stale (prod not finished)"
+    fi
     echo "    04 analysis  $(stage_icon "$ana_done" "$stage" ana)" \
-         "${C_D}${n_figs} figure(s)${C_0}"
+         "${C_D}${ana_label}${C_0}"
 
     # ── raw mdrun output: the active stage's stdout capture, or its .log
     # sidecar when the capture is missing (as in the current T3 prod run) ──
@@ -443,6 +477,13 @@ render() {
             st="▶ ${stage} log active (${log_age}s old) but no SLURM job — manual/local run?"
             stc="$C_Y"
         fi
+    elif [ "$n_figs" -gt 0 ] && [ "$prod_done" != 1 ]; then
+        # incoherent artifact state: figures exist but prod is not finished
+        # and no job is running → the figures on disk are stale (from a prior
+        # run) and must not be read as current results.
+        st="⚠️  stale figures on disk — prod not finished and no job running; "
+        st="${st}do NOT read these as current results"
+        stc="$C_Y"
     else
         st="⏳ idle — chain finished or not submitted"; stc="$C_Y"
     fi

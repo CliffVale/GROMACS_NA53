@@ -87,9 +87,12 @@ fmt_bytes() { # bytes -> human
 
 # ─── data gatherers ─────────────────────────────────────────
 
-squeue_rows() { # our job rows: "JOBID NAME STATE ELAPSED LIMIT NODE/REASON"
+squeue_rows() { # our job rows: "JOBID NAME STATE ELAPSED LIMIT TIME_LEFT REASON"
     command -v squeue >/dev/null 2>&1 || return 0
-    squeue -h -u "$USER" -o "%i %j %T %M %L %R" 2>/dev/null \
+    # %L = TIME_LIMIT (95:00:00), %l = TIME_LEFT (what's remaining).
+    # For running jobs we show time_left as the primary display plus the limit
+    # for context; for queued/pending jobs only elapsed + limit are meaningful.
+    squeue -h -u "$USER" -o "%i %j %T %M %L %l %R" 2>/dev/null \
         | awk '$2 ~ /^na53_/ { print }'
 }
 
@@ -226,7 +229,7 @@ next_label() { # $1 stage key -> human label of what follows
 
 # ─── render ─────────────────────────────────────────────────
 render() {
-    local rows running="" pending="" failed="" jid job st el lim reason
+    local rows running="" pending="" failed="" jid job st el lim tleft reason
     local stage="" log="" total_steps="" total_ps="" cur_step="" cur_ps="" temp="" pres=""
     local fin_eta="" fin_step="" log_age=""
     local rate="" r_ps="" nsday="" eta_s="" eta_s2="" pct="" bar=""
@@ -236,7 +239,7 @@ render() {
     # ── SLURM ──
     rows=$(squeue_rows)
     if [ -n "$rows" ]; then
-        while read -r jid job st el lim reason; do
+        while read -r jid job st el lim tleft reason; do
             [ -z "$jid" ] && continue
             case "$st" in
                 RUNNING|COMPLETING) running="$job" ;;
@@ -335,9 +338,42 @@ render() {
     echo "  profile ${C_B}${PROFILE:-?}${C_0} · host $(hostname) · refresh ${EVERY}s · target ${TARGET_NS} ns"
     echo "${C_C}${RULE}${C_0}"
 
+    # ── run config (what this simulation actually is) ──
+    # These facts stay constant for the run; they're here so you always know
+    # what's being simulated without opening configs/prod.mdp.
+    # Atom count: use the smoke run's known value (290,578) if we can't
+    # read topol.top (it lives in scripts/ during a run and gets cleaned up
+    # between runs). The PDB alone only counts the DNA atoms (1,541).
+    local n_atoms=290578
+    local seq_len=75
+    # Count atoms from the PDB (DNA only) — fall back to the smoke run's
+    # known solvated count if the PDB isn't available or is DNA-only.
+    if [ -f structures/NA53_initial.pdb ]; then
+        local dna_atoms
+        dna_atoms=$(grep -cE "^(ATOM|HETATM)" structures/NA53_initial.pdb 2>/dev/null || echo 0)
+        # DNA-only PDB has ~1500 atoms; the solvated system has ~290k.
+        # Only use the PDB count if it's clearly the full system (>10,000).
+        if [ "$dna_atoms" -gt 10000 ] 2>/dev/null; then
+            n_atoms=$dna_atoms
+        fi
+    fi
+    [ -f structures/NA53.fasta ] && \
+        seq_len=$(grep -v "^>" structures/NA53.fasta | tr -d '\n\r ' | wc -c)
+    [ -z "$seq_len" ] && seq_len=75
+    echo ""
+    echo "  ${C_B}RUN CONFIG${C_0}  (what's being simulated)"
+    echo "    system   NA53 ${seq_len}-nt ssDNA aptamer + NaCl + water"
+    echo "    atoms    ${n_atoms} total (DNA + ions + solvent)"
+    echo "    ensemble NPT · Parrinello-Rahman barostat @ 1.0 bar"
+    echo "    thermostat  V-rescale @ 310.15 K (physiological)"
+    echo "    timestep  2 fs · cutoff 0.8 nm · PME electrostatics"
+    echo "    output    XTC every 10 ps · energy every 10 ps · checkpoint every 15 min"
+    echo "${C_C}${RULE}${C_0}"
+
+    echo ""
     echo "  ${C_B}JOBS${C_0}"
     if [ -n "$rows" ]; then
-        while read -r jid job st el lim reason; do
+        while read -r jid job st el lim tleft reason; do
             [ -z "$jid" ] && continue
             case "$st" in
                 RUNNING|COMPLETING) stc="$C_G"; sttxt="$st" ;;
@@ -348,7 +384,14 @@ render() {
             esac
             echo "    ${C_D}#${jid}${C_0}  ${C_B}${job}${C_0}  ${stc}${sttxt}${C_0}"
             if [ "$st" = "RUNNING" ] || [ "$st" = "COMPLETING" ]; then
-                echo "      ${C_D}${el} elapsed / ${lim} limit · ${reason}${C_0}"
+                # Show TIME_LEFT (primary) for running jobs, then the limit for context.
+                # TIME_LEFT (%l) can be "N/A" for very new jobs or empty if unknown.
+                local tl="${tleft:-}"
+                if [ -n "$tl" ] && [ "$tl" != "N/A" ] && [ "$tl" != "Unknown" ]; then
+                    echo "      ${C_D}${el} elapsed · ${C_B}${tl} left${C_0} / ${lim} limit${C_D} · ${reason}${C_0}"
+                else
+                    echo "      ${C_D}${el} elapsed / ${lim} limit${C_D} · ${reason}${C_0}"
+                fi
             else
                 echo "      ${C_D}waiting: ${reason}${C_0}"
             fi
@@ -357,6 +400,7 @@ render() {
         echo "    ${C_Y}(no na53_* jobs in queue)${C_0}"
     fi
 
+    echo ""
     echo "  ${C_B}STAGE${C_0}"
     if [ -n "$stage" ]; then
         echo "    ${C_B}${STAGE_LABEL[$stage]}${C_0}"
@@ -378,9 +422,11 @@ render() {
         echo "    ${C_Y}(between MD stages — prep/analysis running, or idle)${C_0}"
     fi
 
+    echo ""
     echo "  ${C_B}PHYSICS${C_0}"
     if [ -n "$stage" ] && [ "$stage" != "em" ] && [ -n "$temp" ] && [ -n "$pres" ]; then
-        echo "    T = ${C_B}${temp}${C_0} K      P = ${C_B}${pres}${C_0} bar"
+        echo "    T = ${C_B}${temp}${C_0} K (instantaneous · current temp snapshot)"
+        echo "    P = ${C_B}${pres}${C_0} bar (instantaneous · barostat snapshot)"
     elif [ -n "$stage" ] && [ "$stage" = "em" ]; then
         echo "    ${C_D}EM — minimizing, no T/P yet${C_0}"
     elif [ -z "$stage" ]; then
@@ -388,16 +434,32 @@ render() {
     else
         echo "    ${C_D}(no T/P in the log table yet)${C_0}"
     fi
+    # Mean pressure from the analysis xvg (available once analysis has run).
+    # This is the quantity that matters for equilibration quality.
+    if [ -n "$stage" ] && [ "$stage" != "em" ] && [ -f analysis/energy_Pressure.xvg ]; then
+        local pmean pmin pmax
+        read -r pmean pmin pmax <<< "$(awk '/^ *[0-9]/ && NF>=2 {
+            s+=$2; n++; if(min==""||$2<min) min=$2; if(max==""||$2>max) max=$2
+        } END { if(n>0) printf "%.2f %.2f %.2f", s/n, min, max }' analysis/energy_Pressure.xvg 2>/dev/null)"
+        if [ -n "$pmean" ]; then
+            echo "    mean P = ${C_B}${pmean}${C_0} bar  (range ${pmin}..${pmax} · from energy_Pressure.xvg)"
+        fi
+    fi
 
+    echo ""
     echo "  ${C_B}SPEED + ETA${C_0}"
     if [ -n "$nsday" ]; then
-        echo "    ns/day ${C_B}${nsday}${C_0}${rate:+  (${rate} steps/s @ 2 fs)}${r_ps:+  (${r_ps} ps/s)}"
+        echo "    speed   ${C_B}${nsday} ns/day${C_0}  (${rate} steps/s @ 2 fs · ${r_ps} ps/s)"
+        echo "    how fast the simulation is progressing — used to estimate time remaining"
     elif [ -n "$log_age" ] && [ "$log_age" -gt 600 ]; then
-        echo "    ns/day ${C_D}— log stale (${log_age}s old) — no live speed${C_0}"
+        echo "    speed   ${C_D}— log stale (${log_age}s old) — no live speed${C_0}"
+        echo "    the mdrun log hasn't been updated recently — job may have stopped"
     elif [ -n "$cur_ps" ]; then
-        echo "    ns/day ${C_D}— measuring (needs two polls ≥15 s apart)${C_0}"
+        echo "    speed   ${C_D}— measuring (needs two polls ≥15 s apart)${C_0}"
+        echo "    waiting for two dashboard updates ≥15s apart to calculate a rate"
     else
-        echo "    ns/day ${C_D}— need the first energy block${C_0}"
+        echo "    speed   ${C_D}— need the first energy block${C_0}"
+        echo "    mdrun hasn't printed its energy table yet — speed appears once it does"
     fi
     if [ -n "$eta_s2" ] && [ "$eta_s2" -gt 0 ] 2>/dev/null; then
         echo "    ETA ${C_B}$(fmt_dur "$eta_s2")${C_0} to finish this stage"
@@ -447,18 +509,22 @@ render() {
         mlog=$(ls -t logs/mdrun_*.log 2>/dev/null | head -1)
     fi
     if [ -n "$mlog" ] && [ -f "$mlog" ]; then
-        echo "  ${C_B}LOG${C_0}    ${C_D}tail of ${mlog}${C_0}"
+        echo ""
+    echo "  ${C_B}LOG${C_0}    ${C_D}tail of ${mlog}${C_0}"
         tail -n 4 "$mlog" 2>/dev/null | sed "s/^/    ${C_D}/; s/$/${C_0}/"
     fi
 
     if [ -s logs/run_status.txt ]; then
-        echo "  ${C_B}TRAIL${C_0}"
-        local tline
+    echo ""
+    echo "  ${C_B}TRAIL${C_0}"
+    echo "    ${C_D}Recent launcher events — shows when each stage job was submitted."
+    local tline
         while IFS= read -r tline; do
             echo "    ${C_D}${tline}${C_0}"
         done < <(tail -n 3 logs/run_status.txt)
     fi
 
+    echo ""
     # ── verdict ──
     local st="" stc="$C_Y"
     if [ -n "$failed" ]; then

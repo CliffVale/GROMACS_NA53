@@ -423,8 +423,11 @@ render() {
          "${C_D}topol.top $(fmt_bytes "$(stat -c %s scripts/topol.top 2>/dev/null || echo 0)")${C_0}${prep_suffix}"
     echo "    02 equil     $(stage_icon "$equil_done" "$stage" equil)" \
          "${C_D}npt2.gro $(fmt_bytes "$(stat -c %s scripts/npt2.gro 2>/dev/null || echo 0)")${C_0}"
+    # NOTE: the "target N ns" label is the profile default (PROFILE_NAME_CUR /
+    # TARGET_NS), NOT necessarily the submitted run length — the submitted length
+    # comes from --ns / NS_LENGTH and is only known to the SLURM job itself.
     echo "    03 prod      $(stage_icon "$prod_done" "$stage" prod)" \
-         "${C_D}target ${TARGET_NS} ns · xtc $(fmt_bytes "$(stat -c %s scripts/prod.xtc 2>/dev/null || echo 0)")${C_0}"
+         "${C_D}target ${TARGET_NS} ns (profile default) · xtc $(fmt_bytes "$(stat -c %s scripts/prod.xtc 2>/dev/null || echo 0)")${C_0}"
     local ana_label="${n_figs} figure(s)"
     if [ "$ana_done" = 1 ]; then
         : # figures are current (prod done + figures exist)

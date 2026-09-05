@@ -111,19 +111,21 @@ parse_log() { # $1=stage → sets total_steps total_ps cur_step cur_ps temp
               # logs/mdrun_<stage>.log — mdrun prints its "step N, will
               # finish" ETA + progress tables to stdout; the sidecar carries
               # the same tables. Newer file is primary so restarts win.
-    local s="$1" log out p f src line
+    local s="$1" log out sout src
     log="scripts/$s.log"; out="logs/mdrun_${s}.log"
+    # SLURM capture: sbatch runs mdrun with no internal redirect, so the
+    # "step N, will finish" + totals lines land in logs/na53_<stage>_*.out
+    sout=$(ls -t logs/na53_${s}_*.out 2>/dev/null | head -1)
     total_steps=""; total_ps=""; cur_step=""; cur_ps=""; temp=""; pres=""
     fin_eta=""; fin_step=""; log_age=""
-    # order candidates: newer mtime first (a live stdout redirect usually wins)
-    if [ -f "$out" ] && { [ ! -f "$log" ] \
-        || [ "$(stat -c %Y "$out" 2>/dev/null || echo 0)" -gt \
-             "$(stat -c %Y "$log" 2>/dev/null || echo 0)" ]; }; then
-        p="$out"; f="$log"
-    else
-        p="$log"; f="$out"
-    fi
-    for src in "$p" "$f"; do
+    # candidates: gmx sidecar, redirected stdout, SLURM capture.
+    # Newest mtime first (a live stream wins); each field takes the first hit.
+    local cand=""
+    for src in "$out" "$sout" "$log"; do
+        [ -f "$src" ] && cand="$cand $src"
+    done
+    [ -n "$cand" ] && cand=$(ls -t $cand 2>/dev/null)
+    for src in $cand; do
         [ -f "$src" ] || continue
         if [ -z "$log_age" ]; then
             log_age=$(( $(date +%s) - $(stat -c %Y "$src" 2>/dev/null || echo "$(date +%s)") ))

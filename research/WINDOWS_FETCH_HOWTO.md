@@ -1,4 +1,4 @@
-# Downloading the 100 ns raw results from Taiwania-3 (Windows tablet)
+# Downloading the 15 ns pilot raw results from Taiwania-3 (Windows tablet)
 
 This is the laptop-side companion to `research/reports/2026-09-06-na53-15ns-results-superseded.md`.
 The raw results live on T3 at:
@@ -214,24 +214,7 @@ na53_15ns/
           *.png
 ```
 
-### Run the repo's verification script (WSL / Git bash)
-
-There's a dependency-free check in the repo:
-
-```bash
-bash research/scripts/verify_100ns_fetch.sh
-```
-
-It will:
-
-- confirm the archive tree is there
-- check that `prod.xtc` is roughly the right size for 100 ns
-- print the `Performance:` line from `scripts/prod.log`
-- print the `Performance:` line from `logs/na53_prod_2036720.out`
-- count the analysis xvg files and figures
-- warn if the old smoke logs (`na53_prod_2033888.*`) are sitting in the archive
-
-### Or just eyeball it with a few shell commands
+### Verify the download with a few shell commands
 
 ```bash
 cd na53_15ns

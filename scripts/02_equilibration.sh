@@ -24,6 +24,14 @@ mkdir -p "$LOG_DIR" "$ANALYSIS_DIR"
 
 BASENAME=$(basename "$INPUT_GRO" .gro)
 
+# Runtime energy-term lookup (gmx energy IDs are per-.edr, NOT stable —
+# hardcoded IDs caused the Density/Pressure/Potential mis-extraction bug
+# class three times; see docs/INCIDENT_ANALYSIS.md V-class and
+# gmx_energy_lib.sh header).
+# shellcheck source=scripts/gmx_energy_lib.sh
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gmx_energy_lib.sh"
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  NA53 EQUILIBRATION — $(date)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -44,12 +52,12 @@ gmx grompp -f "$CONFIG_DIR/em.mdp" -c "$INPUT_GRO" \
 gmx mdrun -v -deffnm em $GPU_FLAG \
     > "$LOG_DIR/mdrun_em.log" 2>&1
 
-# Validate EM convergence
-EM_POTENTIAL=$(gmx energy -f em.edr -o "$ANALYSIS_DIR/em_potential.xvg" -b 0 <<EOF 2>/dev/null
-10
-EOF
-)
-echo "  ✓ Energy minimization complete"
+# Validate EM convergence (term looked up by name: NVT-style runs with
+# position restraints shift the numbering, and EM writes no Pressure term,
+# so IDs must never be assumed)
+gmx_energy_extract em.edr "$ANALYSIS_DIR/em_potential.xvg" Potential >/dev/null || true
+EM_POTENTIAL=$(awk '!/^[#@&]/{v=$2} END{printf "%.0f", v}' "$ANALYSIS_DIR/em_potential.xvg" 2>/dev/null || echo "?")
+echo "  ✓ Energy minimization complete (final potential ≈ ${EM_POTENTIAL} kJ/mol)"
 echo "  ℹ  Output: em.gro, em.edr"
 
 # ═══════════════════════════════════════════════════════════
@@ -65,9 +73,10 @@ gmx grompp -f "$CONFIG_DIR/nvt.mdp" -c em.gro -r em.gro \
 gmx mdrun -deffnm nvt $GPU_FLAG \
     > "$LOG_DIR/mdrun_nvt.log" 2>&1
 
-# Validate temperature
+# Validate temperature (term looked up by name — nvt.edr contains a
+# Position-Rest. entry that shifts Temperature to a different ID)
 echo "  ℹ  Checking temperature..."
-echo "15" | gmx energy -f nvt.edr -o "$ANALYSIS_DIR/nvt_temperature.xvg" 2>/dev/null || true
+gmx_energy_extract nvt.edr "$ANALYSIS_DIR/nvt_temperature.xvg" Temperature || true
 echo "  ✓ NVT equilibration complete"
 echo "  ℹ  Output: nvt.gro, nvt.edr"
 
@@ -107,14 +116,10 @@ echo "  ✓ Unrestrained NPT complete"
 echo ""
 echo "▶ Step 5/6: Equilibration Validation..."
 
-# Extract density
-echo "24" | gmx energy -f npt2.edr -o "$ANALYSIS_DIR/npt2_density.xvg" 2>/dev/null || true
-
-# Extract temperature
-echo "15" | gmx energy -f npt2.edr -o "$ANALYSIS_DIR/npt2_temperature.xvg" 2>/dev/null || true
-
-# Extract pressure
-echo "23" | gmx energy -f npt2.edr -o "$ANALYSIS_DIR/npt2_pressure.xvg" 2>/dev/null || true
+# Extract density / temperature / pressure (names, not hardcoded IDs)
+gmx_energy_extract npt2.edr "$ANALYSIS_DIR/npt2_density.xvg" Density || true
+gmx_energy_extract npt2.edr "$ANALYSIS_DIR/npt2_temperature.xvg" Temperature || true
+gmx_energy_extract npt2.edr "$ANALYSIS_DIR/npt2_pressure.xvg" Pressure || true
 
 echo "  ✓ Validation plots generated in $ANALYSIS_DIR/"
 

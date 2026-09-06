@@ -26,6 +26,14 @@ SKIP="${2:-0}"                  # Skip first N ps (for equilibration)
 ANALYSIS_DIR="../analysis"
 mkdir -p "$ANALYSIS_DIR"
 
+# Runtime energy-term lookup — gmx energy IDs are per-.edr, NOT stable.
+# Hardcoded IDs (e.g. "36" for Density) mapped to virial/pressure-tensor
+# components on this build and silently corrupted the energy panels;
+# see docs/INCIDENT_ANALYSIS.md V-class and gmx_energy_lib.sh header.
+# shellcheck source=scripts/gmx_energy_lib.sh
+# shellcheck disable=SC1091
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gmx_energy_lib.sh"
+
 TPR_FILE="${PROD_PREFIX}.tpr"
 XTC_FILE="${PROD_PREFIX}.xtc"
 
@@ -141,17 +149,14 @@ run_analysis "Clustering" \
 echo ""
 echo "▶ Extracting energy terms..."
 if [ -f "${PROD_PREFIX}.edr" ]; then
-    # gmx 2024.x energy term IDs (gmx energy list): 15 Temperature,
-    # 17 Pressure, 36 Density, 11 Potential, 14 Conserved En. Older IDs
-    # (23/24/10/21) silently pulled virial components + Coul. recip.
-    for term in "15:Temperature" "17:Pressure" "36:Density" "11:Potential" "14:Conserved-En"; do
-        ID=$(echo $term | cut -d: -f1)
-        NAME=$(echo $term | cut -d: -f2)
-        echo "$ID" | gmx energy -f ${PROD_PREFIX}.edr \
-            -o "$ANALYSIS_DIR/energy_${NAME}.xvg" \
-            -b $SKIP 2>/dev/null || true
+    # Terms looked up BY NAME from this .edr's own list (IDs shift between
+    # stages — NVT's Position-Rest. entry moved every later term by one;
+    # and "36" on this build is Pres-XY, not Density).
+    for NAME in Temperature Pressure Density Potential Conserved-En; do
+        gmx_energy_extract "${PROD_PREFIX}.edr" "$ANALYSIS_DIR/energy_${NAME}.xvg" "$NAME" \
+            >/dev/null 2>&1 || true
     done
-    echo "  ✓ Energy terms extracted"
+    echo "  ✓ Energy terms extracted (by name)"
 else
     echo "  ⚠️  ${PROD_PREFIX}.edr not found, skipping energy analysis"
 fi

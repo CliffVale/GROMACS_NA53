@@ -33,13 +33,14 @@ fi
 # ── 2. xvg stats: mean / min / max / stdev / final of last col ──
 echo ""
 echo "── XVG STATS (mean / min / max / stdev / final) ──"
-xvg_stats() { # $1 = file, $2 = label, $3 = unit
-    local f="$A/$1"
+xvg_stats() { # $1 = file, $2 = label, $3 = unit, $4 = column (default = last)
+    local f="$A/$1" col="${4:-0}"
     [ -f "$f" ] || { echo "  $2      (missing $1)"; return; }
-    awk -v label="$2" -v unit="$3" '
+    awk -v label="$2" -v unit="$3" -v col="$col" '
         /^[#@]/ { next }
         NF >= 2 {
-            v = $NF
+            # default: last column; explicit col means index (2 = 2nd field)
+            v = (col >= 2) ? $col : $NF
             if (v !~ /^[-+0-9.eE]+$/) next
             n++; s += v; s2 += v*v
             if (n == 1 || v < mn) mn = v
@@ -55,7 +56,7 @@ xvg_stats() { # $1 = file, $2 = label, $3 = unit
         }' "$f"
 }
 xvg_stats rmsd.xvg        "RMSD"            "nm"
-xvg_stats gyrate.xvg      "Rg"              "nm"
+xvg_stats gyrate.xvg      "Rg (s0 total)"   "nm"   2   # col 2 = true total Rg (NOT $NF: that is Rg/sZ/N)
 xvg_stats sasa.xvg        "SASA"            "nm^2"
 xvg_stats hbnum.xvg       "H-bonds (intra)" "#"
 xvg_stats base_pairs.xvg  "Base pairs"      "#"

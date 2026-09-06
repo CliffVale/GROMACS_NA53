@@ -2,10 +2,10 @@
 
 **Prepared:** 2026-09-06 · **Status:** honest pilot write-up (non-converged single trajectory)
 **Companion documents:** `2026-09-06-na53-15ns-run-audit.md` (raw-data corrections) ·
-`2026-09-06-na53-100ns-results.md` (superseded figures, carries correction banner)
-**Raw data mirror:** `/run/media/cliff/WD_HDD/GROMACS/NA53_100ns_results/100ns_prod/` (22 `.xvg`,
+`2026-09-06-na53-15ns-results-superseded.md` (superseded figures, carries correction banner)
+**Raw data mirror:** `/run/media/cliff/WD_HDD/GROMACS/NA53_15ns_results/15ns_prod/` (22 `.xvg`,
 8 `.png`, `prod.xtc` 1.62 GB, `prod.edr`, `prod.cpt`, `prod.log`); T3
-`~/GROMACS_NA53/archive/2026-09-06_100ns_prod/`.
+`~/GROMACS_NA53/archive/2026-09-06_15ns_prod/`.
 
 ---
 
@@ -135,7 +135,7 @@ equilibrated box.
 ## 6. Figures
 
 Corrected figures (energy terms + summary dashboard re-rendered from name-extracted data) are in
-the archive mirror `…/100ns_prod/*.png`: `rmsd`, `rmsf`, `gyrate`, `sasa`, `hbonds`, `pca`,
+the archive mirror `…/15ns_prod/*.png`: `rmsd`, `rmsf`, `gyrate`, `sasa`, `hbonds`, `pca`,
 `energy_terms`, `summary_dashboard`. Note the x-axis of the archived figures reflects the actual
 **15 ns** span.
 

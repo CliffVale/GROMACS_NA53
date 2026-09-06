@@ -1,0 +1,35 @@
+2026-09-04T19:54:36+08:00 | submit profile=taiwania3_cpu partition=ct56 gres='none' ns=1
+2026-09-04T19:54:37+08:00 | job 01_prep id=2031187
+2026-09-04T19:54:39+08:00 | job 02_equil id=2031188
+2026-09-04T19:54:40+08:00 | job 03_prod id=2031189
+2026-09-04T19:54:42+08:00 | job 04_analysis id=2031190
+2026-09-04T23:44:01+08:00 | submit profile=taiwania3_cpu partition=ct56 gres='none' ns=1
+2026-09-04T23:44:03+08:00 | job 01_prep id=2033886
+2026-09-04T23:44:04+08:00 | job 02_equil id=2033887
+2026-09-04T23:44:06+08:00 | job 03_prod id=2033888
+2026-09-04T23:44:07+08:00 | job 04_analysis id=2033889
+2026-09-05T00:02:23+08:00 | submit profile=taiwania3_cpu partition=ct56 gres='none' ns=1
+2026-09-05T00:02:29+08:00 | job 01_prep id=2034005
+2026-09-05T00:02:37+08:00 | job 02_equil id=2034006
+2026-09-05T00:02:41+08:00 | job 03_prod id=2034007
+2026-09-05T00:02:43+08:00 | job 04_analysis id=2034008
+2026-09-05T11:11:37+08:00 | submit profile=taiwania3_cpu partition=ct56 gres='none' ns=15
+2026-09-05T11:11:44+08:00 | job 01_prep id=2036326
+2026-09-05T11:11:46+08:00 | job 02_equil id=2036327
+2026-09-05T11:11:49+08:00 | job 03_prod id=2036329
+2026-09-05T11:11:51+08:00 | job 04_analysis id=2036331
+2026-09-05T11:37:14+08:00 | submit profile=taiwania3_cpu partition=ct56 gres='none' ns=15
+2026-09-05T11:37:16+08:00 | job 01_prep id=2036691
+2026-09-05T11:37:17+08:00 | job 02_equil id=2036692
+2026-09-05T11:37:18+08:00 | job 03_prod id=2036693
+2026-09-05T11:37:21+08:00 | job 04_analysis id=2036694
+2026-09-05T11:42:59+08:00 | submit profile=taiwania3_cpu partition=ct56 gres='none' ns=15
+2026-09-05T11:43:01+08:00 | job 01_prep id=2036713
+2026-09-05T11:43:02+08:00 | job 02_equil id=2036714
+2026-09-05T11:43:04+08:00 | job 03_prod id=2036715
+2026-09-05T11:43:05+08:00 | job 04_analysis id=2036716
+2026-09-05T11:45:51+08:00 | submit profile=taiwania3_cpu partition=ct56 gres='none' ns=15
+2026-09-05T11:45:52+08:00 | job 01_prep id=2036718
+2026-09-05T11:45:54+08:00 | job 02_equil id=2036719
+2026-09-05T11:45:56+08:00 | job 03_prod id=2036720
+2026-09-05T11:45:58+08:00 | job 04_analysis id=2036721

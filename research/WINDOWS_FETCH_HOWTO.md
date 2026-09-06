@@ -1,9 +1,9 @@
 # Downloading the 100 ns raw results from Taiwania-3 (Windows tablet)
 
-This is the laptop-side companion to `research/reports/2026-09-06-na53-100ns-results.md`.
+This is the laptop-side companion to `research/reports/2026-09-06-na53-15ns-results-superseded.md`.
 The raw results live on T3 at:
 
-    ~/GROMACS_NA53/archive/2026-09-06_100ns_prod/
+    ~/GROMACS_NA53/archive/2026-09-06_15ns_prod/
 
 and you want a local copy on the Windows tablet.
 
@@ -54,37 +54,37 @@ If that returns nothing, use the GUI option below instead.
 Run this in PowerShell (or WSL bash) from wherever you keep projects:
 
 ```powershell
-mkdir na53_100ns
-cd na53_100ns
+mkdir na53_15ns
+cd na53_15ns
 ```
 
 If you're in WSL bash, use the bash form:
 
 ```bash
-mkdir -p na53_100ns && cd na53_100ns
+mkdir -p na53_15ns && cd na53_15ns
 ```
 
 ### 2. Fetch everything EXCEPT the trajectory in one tarball
 
 This is one SSH session, compression on the fly, and it produces a single
-`na53_100ns_run.tar.gz` on your tablet.
+`na53_15ns_run.tar.gz` on your tablet.
 
 **WSL bash:**
 
 ```bash
 ssh u5662994@twnia3.nchc.org.tw \
-  'cd ~/GROMACS_NA53 && tar czf - archive/2026-09-06_100ns_prod' \
-  > na53_100ns_run.tar.gz
-tar xzf na53_100ns_run.tar.gz
+  'cd ~/GROMACS_NA53 && tar czf - archive/2026-09-06_15ns_prod' \
+  > na53_15ns_run.tar.gz
+tar xzf na53_15ns_run.tar.gz
 ```
 
 **PowerShell (if ssh is on PATH, e.g. from Git for Windows or OpenSSH):**
 
 ```powershell
 ssh u5662994@twnia3.nchc.org.tw `
-  'cd ~/GROMACS_NA53 && tar czf - archive/2026-09-06_100ns_prod' `
-  > na53_100ns_run.tar.gz
-tar xzf na53_100ns_run.tar.gz
+  'cd ~/GROMACS_NA53 && tar czf - archive/2026-09-06_15ns_prod' `
+  > na53_15ns_run.tar.gz
+tar xzf na53_15ns_run.tar.gz
 ```
 
 You'll see the 2FA prompt. Pick your OTP method when asked.
@@ -104,20 +104,20 @@ You'll see the 2FA prompt. Pick your OTP method when asked.
 
 ### 3. Fetch the trajectory with rsync (resumable)
 
-From inside the same `na53_100ns/` folder:
+From inside the same `na53_15ns/` folder:
 
 **WSL bash:**
 
 ```bash
-rsync -avzP u5662994@twnia3.nchc.org.tw:~/GROMACS_NA53/archive/2026-09-06_100ns_prod/prod.xtc \
-  ./archive/2026-09-06_100ns_prod/
+rsync -avzP u5662994@twnia3.nchc.org.tw:~/GROMACS_NA53/archive/2026-09-06_15ns_prod/prod.xtc \
+  ./archive/2026-09-06_15ns_prod/
 ```
 
 **PowerShell:**
 
 ```powershell
-rsync -avzP u5662994@twnia3.nchc.org.tw:~/GROMACS_NA53/archive/2026-09-06_100ns_prod/prod.xtc `
-  .\archive\2026-09-06_100ns_prod\
+rsync -avzP u5662994@twnia3.nchc.org.tw:~/GROMACS_NA53/archive/2026-09-06_15ns_prod/prod.xtc `
+  .\archive\2026-09-06_15ns_prod\
 ```
 
 What the flags do:
@@ -142,9 +142,9 @@ If rsync/ssh from PowerShell is annoying on the tablet, use an SFTP GUI.
 3. After login, open the built-in SFTP sidebar.
 4. Navigate on the remote side to:
    ```
-   /home/u5662994/GROMACS_NA53/archive/2026-09-06_100ns_prod/
+   /home/u5662994/GROMACS_NA53/archive/2026-09-06_15ns_prod/
    ```
-5. Drag the whole `2026-09-06_100ns_prod` folder to your local side.
+5. Drag the whole `2026-09-06_15ns_prod` folder to your local side.
 
 MobaXTerm can download by SFTP drag-and-drop. For the 1.6 GB xtc, a single GUI
 transfer is fine if your connection is stable, but it won't resume as cleanly as
@@ -196,9 +196,9 @@ After that one prompt per connection, the transfer starts.
 You should now have:
 
 ```
-na53_100ns/
+na53_15ns/
   archive/
-    2026-09-06_100ns_prod/
+    2026-09-06_15ns_prod/
       prod.xtc        (~1.6 GB)
       prod.edr
       prod.cpt
@@ -234,13 +234,13 @@ It will:
 ### Or just eyeball it with a few shell commands
 
 ```bash
-cd na53_100ns
-ls -la archive/2026-09-06_100ns_prod/prod.xtc
-ls -la archive/2026-09-06_100ns_prod/scripts/prod.log
-grep -a "Performance:" archive/2026-09-06_100ns_prod/scripts/prod.log | tail -1
-grep -a "Finished mdrun" archive/2026-09-06_100ns_prod/scripts/prod.log | tail -1
-ls archive/2026-09-06_100ns_prod/analysis/*.xvg | wc -l
-ls archive/2026-09-06_100ns_prod/results/figures/*.png | wc -l
+cd na53_15ns
+ls -la archive/2026-09-06_15ns_prod/prod.xtc
+ls -la archive/2026-09-06_15ns_prod/scripts/prod.log
+grep -a "Performance:" archive/2026-09-06_15ns_prod/scripts/prod.log | tail -1
+grep -a "Finished mdrun" archive/2026-09-06_15ns_prod/scripts/prod.log | tail -1
+ls archive/2026-09-06_15ns_prod/analysis/*.xvg | wc -l
+ls archive/2026-09-06_15ns_prod/results/figures/*.png | wc -l
 ```
 
 Expected outcomes:
@@ -264,15 +264,15 @@ Expected outcomes:
   1. On T3 (one ssh command):
      ```bash
      ssh u5662994@twnia3.nchc.org.tw \
-       'cd ~/GROMACS_NA53 && tar czf na53_100ns_run.tar.gz archive/2026-09-06_100ns_prod'
+       'cd ~/GROMACS_NA53 && tar czf na53_15ns_run.tar.gz archive/2026-09-06_15ns_prod'
      ```
   2. Then on the tablet:
      ```bash
-     rsync -avzP u5662994@twnia3.nchc.org.tw:~/GROMACS_NA53/na53_100ns_run.tar.gz .
+     rsync -avzP u5662994@twnia3.nchc.org.tw:~/GROMACS_NA53/na53_15ns_run.tar.gz .
      ```
   3. Then:
      ```bash
-     tar xzf na53_100ns_run.tar.gz
+     tar xzf na53_15ns_run.tar.gz
      ```
 
 ---
@@ -282,13 +282,13 @@ Expected outcomes:
 Any folder you control on the tablet is fine. A common choice:
 
 ```
-Documents/GROMACS_NA53/na53_100ns/
+Documents/GROMACS_NA53/na53_15ns/
 ```
 
 or next to a local clone of the repo:
 
 ```
-c:\users\<you>\projects\GROMACS_NA53\na53_100ns\
+c:\users\<you>\projects\GROMACS_NA53\na53_15ns\
 ```
 
 The only requirement is that you can write there and that you remember where it
@@ -301,7 +301,7 @@ is for the next analysis step.
 Once the fetch is verified:
 
 1. If you have GROMACS + a viewer on the tablet, you can re-render figures from
-   `archive/2026-09-06_100ns_prod/analysis/*.xvg` — but first fix the density/pressure
+   `archive/2026-09-06_15ns_prod/analysis/*.xvg` — but first fix the density/pressure
    term ID issue on T3 and re-extract, otherwise the energy panels will be wrong.
 2. Otherwise, just keep the archive as your local raw-data copy. The next step is
    the density/pressure ID verification on T3, then re-rendering figures there and

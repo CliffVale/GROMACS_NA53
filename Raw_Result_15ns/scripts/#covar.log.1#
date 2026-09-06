@@ -1,0 +1,20 @@
+Covariance analysis log, written Sat Sep  5 02:28:52 2026
+
+Program: covar
+Working directory: /home/u5662994/GROMACS_NA53/scripts
+
+Read 101 frames from prod.xtc (time 0 to 1000 ps)
+Read reference structure for fit from prod.tpr
+
+Analysis group is 'DNA' (2383 atoms)
+Fit group is 'DNA' (2383 atoms)
+Analysis is non-mass weighted
+Fit is non-mass weighted
+Diagonalized the 7149x7149 covariance matrix
+Trace of the covariance matrix before diagonalizing: 346.304
+Trace of the covariance matrix after diagonalizing: 346.303
+
+Wrote 100 eigenvalues to ../analysis/eigenval.xvg
+Wrote reference structure to ../analysis/eigenvec.trr
+Wrote average structure to average.pdb and ../analysis/eigenvec.trr
+Wrote eigenvectors 1 to 100 to ../analysis/eigenvec.trr

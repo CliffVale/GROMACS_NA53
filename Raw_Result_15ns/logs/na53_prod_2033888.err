@@ -1,0 +1,61 @@
+                :-) GROMACS - gmx grompp, 2024.4-conda_forge (-:
+
+Executable:   /home/u5662994/miniconda3/envs/na53_aptamer/bin.AVX2_256/gmx
+Data prefix:  /home/u5662994/miniconda3/envs/na53_aptamer
+Working dir:  /home/u5662994/GROMACS_NA53/scripts
+Command line:
+  gmx grompp -f prod_mdp_temp.mdp -c npt2.gro -p topol.top -o prod.tpr
+
+Ignoring obsolete mdp entry 'ns_type'
+
+NOTE 1 [file prod_mdp_temp.mdp]:
+  You have set rlist larger than the interaction cut-off, but you also have
+  verlet-buffer-tolerance > 0. Will set rlist using
+  verlet-buffer-tolerance.
+
+
+NOTE 2 [file prod_mdp_temp.mdp]:
+  nstcomm < nstcalcenergy defeats the purpose of nstcalcenergy, consider
+  setting nstcomm equal to nstcalcenergy for less overhead
+
+Generating 1-4 interactions: fudge = 0.5
+Number of degrees of freedom in T-Coupling group DNA is 6306.97
+Number of degrees of freedom in T-Coupling group Water_and_ions is 576999.06
+
+There were 2 NOTEs
+
+GROMACS reminds you: "Praise those of your critics for whom nothing is up to standard." (Dag Hammarskjold)
+
+                :-) GROMACS - gmx mdrun, 2024.4-conda_forge (-:
+
+Executable:   /home/u5662994/miniconda3/envs/na53_aptamer/bin.AVX2_256/gmx
+Data prefix:  /home/u5662994/miniconda3/envs/na53_aptamer
+Working dir:  /home/u5662994/GROMACS_NA53/scripts
+Command line:
+  gmx mdrun -deffnm prod -ntomp 56 -cpo prod -cpt 900
+
+Compiled SIMD is AVX2_256, but CPU also supports AVX_512 (see log).
+The current CPU can measure timings more accurately than the code in
+gmx mdrun was configured to use. This might affect your simulation
+speed as accurate timings are needed for load-balancing.
+Please consider rebuilding gmx mdrun with the GMX_USE_RDTSCP=ON CMake option.
+Reading file prod.tpr, VERSION 2024.4-conda_forge (single precision)
+Changing nstlist from 10 to 40, rlist from 0.804 to 0.91
+
+
+Using 1 MPI thread
+Using 56 OpenMP threads 
+
+starting mdrun 'Protein in water'
+500000 steps,   1000.0 ps.
+
+Writing final coordinates.
+
+               Core t (s)   Wall t (s)        (%)
+       Time:   265230.243     4736.291     5600.0
+                         1h18:56
+                 (ns/day)    (hour/ns)
+Performance:       18.242        1.316
+
+GROMACS reminds you: "The final page is written in the books of history" (Bad Religion)
+

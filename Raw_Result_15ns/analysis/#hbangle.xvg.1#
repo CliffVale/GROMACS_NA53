@@ -1,0 +1,47 @@
+# This file was created Sat Sep  5 02:23:12 2026
+# Created by:
+#                :-) GROMACS - gmx hbond, 2024.4-conda_forge (-:
+# 
+# Executable:   /home/u5662994/miniconda3/envs/na53_aptamer/bin.AVX2_256/gmx
+# Data prefix:  /home/u5662994/miniconda3/envs/na53_aptamer
+# Working dir:  /home/u5662994/GROMACS_NA53/scripts
+# Command line:
+#   gmx hbond -s prod.tpr -f prod.xtc -r 'group DNA' -t 'group DNA' -num ../analysis/hbnum.xvg -dist ../analysis/hbdist.xvg -ang ../analysis/hbangle.xvg -b 0
+# gmx hbond is part of G R O M A C S:
+#
+# Gromacs Runs On Most of All Computer Systems
+#
+@    title "Hydrogen Bond Angle Distribution Histogram"
+@    xaxis  label "Hydrogen - Donor - Acceptor Angle (degrees)"
+@    yaxis  label "Probability"
+@TYPE xy
+       0.5  0.0057351
+       1.5  0.0160862
+       2.5  0.0258777
+       3.5  0.0332914
+       4.5  0.0416842
+       5.5  0.0467198
+       6.5  0.0538537
+       7.5  0.0502168
+       8.5  0.0555322
+       9.5  0.0565114
+      10.5  0.0569310
+      11.5  0.0503567
+      12.5  0.0516156
+      13.5  0.0429431
+      14.5  0.0442020
+      15.5  0.0376276
+      16.5  0.0345503
+      17.5  0.0348300
+      18.5  0.0275563
+      19.5  0.0272765
+      20.5  0.0265771
+      21.5  0.0222409
+      22.5  0.0212617
+      23.5  0.0207022
+      24.5  0.0205623
+      25.5  0.0169254
+      26.5  0.0190236
+      27.5  0.0187439
+      28.5  0.0202826
+      29.5  0.0202826

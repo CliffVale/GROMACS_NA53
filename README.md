@@ -250,7 +250,7 @@ not simulated).
 report (Word/PDF-ready markdown), the raw-data audit, and the road map (replicas → genuine
 100 ns via two RESTART segments → force-field check → explicit NGAL docking) are in
 [`research/reports/`](research/reports/): `2026-09-06-na53-15ns-pilot-writeup.md` (write-up) ·
-`2026-09-06-na53-15ns-run-audit.md` (corrections) · `2026-09-06-na53-100ns-results.md`
+`2026-09-06-na53-15ns-run-audit.md` (corrections) · `2026-09-06-na53-15ns-results-superseded.md`
 (superseded, carries a correction banner).
 
 ---

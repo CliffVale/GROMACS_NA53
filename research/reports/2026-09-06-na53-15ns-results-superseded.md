@@ -117,7 +117,7 @@ Frames clustered on the DNA selection (group 1). The cluster occupancy summary i
 ## 7. Data provenance
 
 - **Durable record:** this report + `memory.md`. Raw artifacts are gitignored by design (`/analysis/`, `/results/`, `logs/*.out`).
-- **Archive (T3):** `archive/2026-09-06_100ns_prod/` — contains:
+- **Archive (T3):** `archive/2026-09-06_15ns_prod/` — contains:
   - **Trajectory:** `prod.xtc` (1.62 GB)
   - **Energy database:** `prod.edr` (415 KB)
   - **Checkpoint:** `prod.cpt` (7.0 MB) — resumable if needed
@@ -138,29 +138,29 @@ Run these from **your laptop**, not from T3. The archive folder on T3 is the sou
 ### A. Small artifacts (figures, xvg, logs, edr, cpt) — single transfer
 
 ```bash
-mkdir -p na53_100ns && cd na53_100ns
+mkdir -p na53_15ns && cd na53_15ns
 ssh u5662994@twnia3.nchc.org.tw \
-  'cd ~/GROMACS_NA53 && tar czf - archive/2026-09-06_100ns_prod' \
-  > na53_100ns_run.tar.gz
-tar xzf na53_100ns_run.tar.gz
+  'cd ~/GROMACS_NA53 && tar czf - archive/2026-09-06_15ns_prod' \
+  > na53_15ns_run.tar.gz
+tar xzf na53_15ns_run.tar.gz
 ```
 
-This gives you a local `na53_100ns/archive/2026-09-06_100ns_prod/` mirror with everything except the trajectory (kept separate below because it's large).
+This gives you a local `na53_15ns/archive/2026-09-06_15ns_prod/` mirror with everything except the trajectory (kept separate below because it's large).
 
 ### B. The trajectory (large, 1.62 GB) — resumable transfer
 
 ```bash
-# From inside your na53_100ns/ folder (or wherever you want it):
-rsync -avzP u5662994@twnia3.nchc.org.tw:~/GROMACS_NA53/archive/2026-09-06_100ns_prod/prod.xtc \
-  ./archive/2026-09-06_100ns_prod/
+# From inside your na53_15ns/ folder (or wherever you want it):
+rsync -avzP u5662994@twnia3.nchc.org.tw:~/GROMACS_NA53/archive/2026-09-06_15ns_prod/prod.xtc \
+  ./archive/2026-09-06_15ns_prod/
 ```
 
 `-P` makes it resumable if the link drops. If you prefer a single archive including the trajectory:
 
 ```bash
 ssh u5662994@twnia3.nchc.org.tw \
-  'cd ~/GROMACS_NA53 && tar czf - archive/2026-09-06_100ns_prod' \
-  > na53_100ns_full.tar.gz
+  'cd ~/GROMACS_NA53 && tar czf - archive/2026-09-06_15ns_prod' \
+  > na53_15ns_full.tar.gz
 ```
 
 (≈1.7 GB compressed; if the link is unreliable, use the rsync-on-tarball pattern from `research/midrun_download_plan.md`.)
@@ -168,9 +168,9 @@ ssh u5662994@twnia3.nchc.org.tw \
 ### C. Verify after download
 
 ```bash
-ls -la na53_100ns/archive/2026-09-06_100ns_prod/prod.xtc   # should be ~1.6 GB
-ls na53_100ns/archive/2026-09-06_100ns_prod/analysis/*.xvg | wc -l  # expect ~22
-ls na53_100ns/archive/2026-09-06_100ns_prod/results/figures/*.png | wc -l  # expect 8
+ls -la na53_15ns/archive/2026-09-06_15ns_prod/prod.xtc   # should be ~1.6 GB
+ls na53_15ns/archive/2026-09-06_15ns_prod/analysis/*.xvg | wc -l  # expect ~22
+ls na53_15ns/archive/2026-09-06_15ns_prod/results/figures/*.png | wc -l  # expect 8
 ```
 
 ---
@@ -192,7 +192,7 @@ ls na53_100ns/archive/2026-09-06_100ns_prod/results/figures/*.png | wc -l  # exp
    - **Move to GPU** if a Taiwania GPU allocation is available — the repo already has `profiles/taiwania3_gpu.env` and `docs/HPC_GPU_OPTIONS.md`; the CPU rate here is the baseline to compare GPU speed-up against.
    - **Replicas** — a second independent 100 ns run from a different starting conformation/seed would directly test whether the compact fold + 3′ tail flexibility is robust or an artifact of this trajectory's history.
 3. **Use the checkpoint** (`prod.cpt`) if you extend this exact run — `RESTART=1 sbatch ...` continues from the last saved state rather than re-running 100 ns.
-4. **Archive the corrected figures** back into `archive/2026-09-06_100ns_prod/results/figures/` once re-rendered, so the archive is self-contained.
+4. **Archive the corrected figures** back into `archive/2026-09-06_15ns_prod/results/figures/` once re-rendered, so the archive is self-contained.
 
 ---
 

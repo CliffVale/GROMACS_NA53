@@ -1,0 +1,50 @@
+Job ID: 2036718
+Node:   cpn3013
+Start:  Sat Sep  5 11:47:42 CST 2026
+                   :-) GROMACS - gmx, 2024.4-conda_forge (-:
+▶ Running system preparation...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NA53 SYSTEM PREP — Sat Sep  5 11:47:42 CST 2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Input:    ../structures/NA53_initial.pdb
+  Force Field: amber99sb-ildn
+  Water:    tip3p
+  Box:      dodecahedron (1.2 nm padding)
+  [NaCl]:   0.15 M
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+▶ Step 1/4: Generating topology with pdb2gmx...
+  ✓ Topology generated: topol.top
+  ✓ Processed structure: NA53_initial_processed.gro
+  ℹ  Check topol.top for charge information
+
+▶ Step 2/4: Defining simulation box...
+  ✓ Box defined: dodecahedron (1.2 nm padding)
+  Box vectors:
+   75DA     O3' 2382  15.290   7.678   1.019
+   75DA     H3T 2383  15.318   7.619   0.943
+  16.14635  16.14635  11.41720   0.00000   0.00000   0.00000   0.00000   8.07318   8.07318
+
+▶ Step 3/4: Solvating system with tip3p water...
+  ✓ Solvation complete
+  ℹ  Water molecules added: ~96473
+
+▶ Step 4/4: Adding ions (0.15 M NaCl)...
+  ✓ Ions added: Na⁺/Cl⁻ (neutral, 0.15 M)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SYSTEM PREP COMPLETE — Verification
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ✓ NA53_initial_ionized.gro
+  ✓ topol.top
+  ℹ  Total atoms: 290578
+
+  Output files:
+    NA53_initial_ionized.gro  (solvated + ionized structure)
+    topol.top                (molecular topology)
+
+  Next step: Run 02_equilibration.sh
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+End: Sat Sep  5 11:47:45 CST 2026
+System preparation complete — submit 02_equil.sbatch next

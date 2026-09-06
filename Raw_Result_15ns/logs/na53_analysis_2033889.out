@@ -1,0 +1,125 @@
+Job ID: 2033889
+Node:   cpn3012
+Start:  Sat Sep  5 02:23:02 CST 2026
+                   :-) GROMACS - gmx, 2024.4-conda_forge (-:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NA53 ANALYSIS — Sat Sep  5 02:23:02 CST 2026
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Trajectory: prod.xtc
+  Reference:  prod.tpr
+  Skip first: 0 ps
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+▶ RMSD...
+  ✓ RMSD complete
+
+▶ RMSF...
+  ✓ RMSF complete
+
+▶ Radius_of_Gyration...
+  ✓ Radius_of_Gyration complete
+
+▶ Hydrogen_Bonds...
+  ✓ Hydrogen_Bonds complete
+
+▶ SASA...
+  ✓ SASA complete
+
+▶ Principal Component Analysis...
+  ✓ PCA complete
+
+▶ Clustering...
+  ✓ Clustering complete
+
+▶ Extracting energy terms...
+
+Statistics over 500001 steps [ 0.0000 through 1000.0000 ps ], 1 data sets
+All statistics are over 101 points (frames)
+
+Energy                      Average   Err.Est.       RMSD  Tot-Drift
+-------------------------------------------------------------------------------
+Temperature                 310.137      0.029    0.53399   0.126855  (K)
+
+Statistics over 500001 steps [ 0.0000 through 1000.0000 ps ], 1 data sets
+All statistics are over 101 points (frames)
+
+Energy                      Average   Err.Est.       RMSD  Tot-Drift
+-------------------------------------------------------------------------------
+Density                     988.366       0.18    1.66342 0.00675083  (kg/m^3)
+
+Statistics over 500001 steps [ 0.0000 through 1000.0000 ps ], 1 data sets
+All statistics are over 101 points (frames)
+
+Energy                      Average   Err.Est.       RMSD  Tot-Drift
+-------------------------------------------------------------------------------
+pV                          178.837      0.032   0.301011 -0.00104021  (kJ/mol)
+
+Statistics over 500001 steps [ 0.0000 through 1000.0000 ps ], 1 data sets
+All statistics are over 101 points (frames)
+
+Energy                      Average   Err.Est.       RMSD  Tot-Drift
+-------------------------------------------------------------------------------
+Coul. recip.                68312.3         25    285.507    51.2935  (kJ/mol)
+
+Statistics over 500001 steps [ 0.0000 through 1000.0000 ps ], 1 data sets
+All statistics are over 101 points (frames)
+
+Energy                      Average   Err.Est.       RMSD  Tot-Drift
+-------------------------------------------------------------------------------
+Box-Z                       11.4084    0.00068 0.00640053 -2.35003e-05  (nm)
+  ✓ Energy terms extracted
+
+▶ Base-pair analysis (Watson-Crick)...
+  ✓ Base-pair analysis complete
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ANALYSIS COMPLETE — Output Files
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Structural metrics:
+    ../analysis/rmsd.xvg          (RMSD vs time)
+    ../analysis/rmsf.xvg          (RMSF per residue)
+    ../analysis/gyrate.xvg        (Radius of gyration)
+
+  Interaction metrics:
+    ../analysis/hbnum.xvg         (H-bond count)
+    ../analysis/base_pairs.xvg    (Base-pair count)
+
+  Solvent metrics:
+    ../analysis/sasa.xvg          (Total SASA)
+
+  Dynamics metrics:
+    ../analysis/proj.xvg          (PCA projection)
+    ../analysis/clusters.xpm      (Cluster matrix)
+    ../analysis/cluster.log      (Cluster sizes/occupancy)
+
+  Energy metrics:
+    ../analysis/energy_Temperature.xvg
+    ../analysis/energy_Pressure.xvg
+    ../analysis/energy_Density.xvg
+    ../analysis/energy_Potential.xvg
+    ../analysis/energy_Conserved-En.xvg
+
+  Next step: Run 05_visualization.py for figures
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NA53 VISUALIZATION — Generating plots
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Analysis dir: ../analysis
+  Figures dir:  ../results/figures
+  ✓ RMSD plot saved
+  ✓ RMSF plot saved
+  ✓ Radius of gyration plot saved
+  ✓ Hydrogen bond plot saved
+  ✓ SASA plot saved
+  ✓ Energy terms plot saved
+  ✓ PCA plot saved
+  ✓ Summary dashboard saved
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ALL PLOTS GENERATED
+  Output directory: ../results/figures
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+End: Sat Sep  5 02:29:10 CST 2026
+Analysis complete — check ../results/figures/ and ../analysis/

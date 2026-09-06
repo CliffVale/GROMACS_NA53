@@ -157,6 +157,17 @@ if [ -f "${PROD_PREFIX}.edr" ]; then
             >/dev/null 2>&1 || true
     done
     echo "  ✓ Energy terms extracted (by name)"
+    echo "  ℹ  Post-extraction sanity checks (steady-state mean):"
+    # SANITY GATES — every energy figure downstream depends on these files
+    # being the term they claim to be. Windows from configs/*.mdp targets
+    # (T 310.15 K, P 1.0 bar) + water physics (ρ ~997 kg/m³). Bug-era
+    # energy_Density.xvg held Pres-XY (~0 bar) — caught by the density
+    # window; bug-era nvt file held Conserved-En (-4.09e6) — caught by T.
+    gmx_energy_check "$ANALYSIS_DIR/energy_Temperature.xvg" "Prod temperature" 300 320 "K"
+    gmx_energy_check "$ANALYSIS_DIR/energy_Density.xvg" "Prod density" 950 1050 "kg/m^3"
+    gmx_energy_check "$ANALYSIS_DIR/energy_Pressure.xvg" "Prod pressure" -100 100 "bar"
+    gmx_energy_check "$ANALYSIS_DIR/energy_Potential.xvg" "Prod potential" -1000000000000 -1000 "kJ/mol"
+    echo "  ✓ Energy sanity checks passed — values are physical"
 else
     echo "  ⚠️  ${PROD_PREFIX}.edr not found, skipping energy analysis"
 fi

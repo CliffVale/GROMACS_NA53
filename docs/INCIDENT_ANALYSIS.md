@@ -25,6 +25,7 @@ matters: each class has one structural prevention, not a per-flag patch.
 | **S — shell fragility** | Backgrounding, exit-code masking, cwd-relative paths | S1–S4 |
 | **G — group-index assumption** | Protein-tutorial group numbering applied to a DNA system | G1 |
 | **K — packaging** | The *repo itself* can't reproduce from a fresh clone | K1–K2 |
+| **E — energy-term extraction** | `gmx energy` term **IDs assumed stable**; they are per-`.edr` (added terms shift the numbering) and build-specific | E1–E3 |
 
 ---
 
@@ -88,6 +89,21 @@ complained — only domain sense (30–40 H-bonds on a 12-bp duplex) caught it.
 | K1 | `./run_simulation.sh` → *Permission denied* on a fresh clone | everything committed mode 100644 | `git update-index --chmod=+x` (recorded in the index; verified 755 materializes on a Linux clone) |
 | K2 | equilibration died: *`../configs/em.mdp` does not exist* on a fresh clone | `.gitignore` globs `em.*`/`nvt.*`/`npt*.*` (meant for grompp/mdrun **outputs**) also matched the **input** MDP configs → never committed | `!em.mdp !nvt.mdp !npt.mdp !npt_free.mdp` negations |
 
+### E — energy-term extraction
+
+| # | Failure | Root cause | Fix |
+|---|---|---|---|
+| E1 | `energy_Density.xvg` oscillated around ~0 bar; report "density 2.6 kg/m³" | term **36 = Pres-XY** (pressure-tensor element) on gmx 2024.4 conda, assumed to be Density (= 23) | terms looked up **by name** from each `.edr`'s own list |
+| E2 | `nvt_temperature.xvg` held Conserved-En (−4.1e6), not ~310 K | NVT `.edr` gains a `Position-Rest.` entry that shifts every later term (Temperature = 16, not 15) | same name-based lookup; verified live on T3 |
+| E3 | `em_potential.xvg` held Coul.-recip (+8.4e4); `npt2_density`/`npt2_pressure` swapped (pV/Density) | hardcoded IDs that match *some other* run's numbering | name-based lookup **+ physical sanity gates** (below) |
+
+**Why they happened (3 separate times):** energy term numbering is an
+implementation detail of each `.edr`, so any hardcoded ID is fragile — and
+the failure is *silent* because `gmx energy` happily writes whichever term
+the ID names. Physical sense is the only reliable detector, which is why the
+fix is two layers: look the term up by name (correct file) **and** verify the
+result is physically possible (correct content).
+
 **Why they happened:** validation happened only in the working directory,
 where the files existed and exec bits were cosmetic. The only true test is a
 fresh clone — which is why the clone-and-run trial is now part of the
@@ -105,7 +121,11 @@ acceptance procedure (§5).
    (S1/S2), turning "fails loudly" bugs into "fails quietly" ones.
 4. **Wrong-target analyses are silent** — selecting water instead of DNA
    produces valid plots (G1). Only a group-name assertion catches it.
-5. **Working-tree-only validation** — syntax and even successful runs in the
+5. **No physical assertion on extracted terms** — `gmx energy` writes
+   whatever term the ID names, so a wrong ID yields a *plausible-looking*
+   xvg that only physics can refute (E1–E3). The post-extraction sanity
+   gates (steady-state mean in a physical window) close this.
+6. **Working-tree-only validation** — syntax and even successful runs in the
    author's checkout prove nothing about a fresh clone (K1/K2).
 
 ---
@@ -119,6 +139,7 @@ acceptance procedure (§5).
 | S | stage scripts run mdrun foreground; launcher gates on real rc; paths anchored to `$REPO_ROOT` | code review + rules.md R7 |
 | G | analysis targets the named group via the documented index layout; doctor cross-checks group 1 = **DNA** against any existing `.tpr` | `04_analysis.sh` header + doctor |
 | K | static checker asserts every runtime file is present **and not gitignored**, and entry points are 100755 in the index | `scripts/check_repo_integrity.sh` in **CI** (every push) |
+| E | terms extracted **by name** per `.edr` (`gmx_energy_lib.sh`) **and** every extracted xvg passes a post-extraction physical sanity gate: steady-state mean must be T ∈ [300,320] K, ρ ∈ [950,1050] kg/m³, P ∈ [−100,100] bar, potential < −1000 kJ/mol — wired into stages 02 and 04 so a wrong term **aborts the job** (`set -e`) instead of corrupting figures | `scripts/gmx_energy_lib.sh` + `02_equilibration.sh` + `04_analysis.sh` |
 
 **One extra habit that caught K1/K2 and would have caught everything else:**
 run the flow from a **fresh clone** (`git clone` → run) at least once per

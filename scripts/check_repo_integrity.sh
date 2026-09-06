@@ -15,6 +15,8 @@
 #       refcoord_scaling=com, restraints left in production)
 #   C4  unresolved CHANGE_ME placeholders in executable pipeline files
 #   C5  shell/python syntax breakage
+#   C6  energy-term sanity gates still wired into 02/04 (E-class
+#       regression guard — see docs/INCIDENT_ANALYSIS.md class E)
 #
 # No gmx required — runs on CI and on any host.
 # Usage:  bash scripts/check_repo_integrity.sh
@@ -127,6 +129,25 @@ if grep -rn "CHANGE_ME" slurm/ scripts/ \
 else
     pass "no CHANGE_ME in slurm/ or scripts/"
 fi
+
+# ── C6: energy-term sanity gates must stay wired (E-class guard) ──
+section "Energy sanity gates (C6)"
+if grep -q "gmx_energy_check" scripts/gmx_energy_lib.sh; then
+    pass "gmx_energy_check defined in gmx_energy_lib.sh"
+else
+    fail "gmx_energy_check missing from gmx_energy_lib.sh — E-class guard removed"
+fi
+E_CALLS=0
+for stage in 02_equilibration 04_analysis; do
+    n=$(grep -c "gmx_energy_check" "scripts/$stage.sh" 2>/dev/null || echo 0)
+    if [ "$n" -ge 3 ]; then
+        pass "$stage.sh calls gmx_energy_check ×$n (density/temperature/pressure gates)"
+        E_CALLS=$((E_CALLS + n))
+    else
+        fail "$stage.sh has only $n gmx_energy_check calls — expected ≥3"
+    fi
+done
+[ "$E_CALLS" -ge 6 ] && pass "energy sanity gates wired in both analysis stages"
 
 # ── Phase-5 gate: input PDB (informational — ships empty by design) ──
 section "Input structure (Phase 5)"

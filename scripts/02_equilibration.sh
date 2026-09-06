@@ -59,6 +59,9 @@ gmx_energy_extract em.edr "$ANALYSIS_DIR/em_potential.xvg" Potential >/dev/null 
 EM_POTENTIAL=$(awk '!/^[#@&]/{v=$2} END{printf "%.0f", v}' "$ANALYSIS_DIR/em_potential.xvg" 2>/dev/null || echo "?")
 echo "  ✓ Energy minimization complete (final potential ≈ ${EM_POTENTIAL} kJ/mol)"
 echo "  ℹ  Output: em.gro, em.edr"
+# SANITY GATE — a positive or near-zero "potential" means the wrong term
+# was extracted (bug-era em_potential.xvg held Coul. recip., +8.4e4 kJ/mol)
+gmx_energy_check "$ANALYSIS_DIR/em_potential.xvg" "EM potential" -1000000000000 -1000 "kJ/mol"
 
 # ═══════════════════════════════════════════════════════════
 # STEP 2: NVT EQUILIBRATION (100 ps)
@@ -77,6 +80,8 @@ gmx mdrun -deffnm nvt $GPU_FLAG \
 # Position-Rest. entry that shifts Temperature to a different ID)
 echo "  ℹ  Checking temperature..."
 gmx_energy_extract nvt.edr "$ANALYSIS_DIR/nvt_temperature.xvg" Temperature || true
+# SANITY GATE — bug-era nvt_temperature.xvg held Conserved-En (-4.09e6)
+gmx_energy_check "$ANALYSIS_DIR/nvt_temperature.xvg" "NVT temperature" 300 320 "K"
 echo "  ✓ NVT equilibration complete"
 echo "  ℹ  Output: nvt.gro, nvt.edr"
 
@@ -120,6 +125,14 @@ echo "▶ Step 5/6: Equilibration Validation..."
 gmx_energy_extract npt2.edr "$ANALYSIS_DIR/npt2_density.xvg" Density || true
 gmx_energy_extract npt2.edr "$ANALYSIS_DIR/npt2_temperature.xvg" Temperature || true
 gmx_energy_extract npt2.edr "$ANALYSIS_DIR/npt2_pressure.xvg" Pressure || true
+
+# SANITY GATES — steady-state mean must sit at physical values
+# (T ref 310.15 K, P ref 1.0 bar, ρ ≈ water ~997 kg/m³). Bug-era files
+# carried pV / Density in the wrong slots (178.8 kg/m³ "density",
+# 988.7 kg/m³ "pressure") — both windows below catch those swaps.
+gmx_energy_check "$ANALYSIS_DIR/npt2_density.xvg" "NPT2 density" 950 1050 "kg/m^3"
+gmx_energy_check "$ANALYSIS_DIR/npt2_temperature.xvg" "NPT2 temperature" 300 320 "K"
+gmx_energy_check "$ANALYSIS_DIR/npt2_pressure.xvg" "NPT2 pressure" -100 100 "bar"
 
 echo "  ✓ Validation plots generated in $ANALYSIS_DIR/"
 

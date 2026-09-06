@@ -26,8 +26,9 @@
 gmx_energy_id() {
     local edr="$1" want="$2" id
     [ -f "$edr" ] || { echo "gmx_energy_id: no such file: $edr" >&2; return 1; }
-    # Feeding "0" makes `gmx energy` print its numbered term list and exit.
-    id=$(printf "0\n" | gmx energy -f "$edr" -o /dev/null 2>/dev/null | \
+    # Feeding "0" makes `gmx energy` print its numbered term list (to
+    # STDERR) and exit — merge 2>&1 so the list reaches the parser.
+    id=$(printf "0\n" | gmx energy -f "$edr" -o /dev/null 2>&1 | \
         awk -v want="$want" '
             /^ *[0-9]+/ {
                 n = split($0, tok, / +/)

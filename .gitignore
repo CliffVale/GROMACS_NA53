@@ -74,3 +74,8 @@ slurm/jobs/
 *.tmp
 *.bak
 prod_mdp_temp.mdp
+
+# Local-only pristine raw-run copy (15 ns pilot) — never commit (2.6 GB, duplicates analysis/)
+/Raw_Result_15ns/
+# gmx auto-backup files (#name.1#) — raw run debris, not source
+*#

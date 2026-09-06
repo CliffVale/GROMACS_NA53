@@ -4,7 +4,7 @@
 | Project at a glance | |
 |---|---|
 | **The science** | Predict how the **NA53 aptamer** (75-nt DNA) folds in 3D, so it can be used in a biosensor for **NGAL** (a kidney-injury biomarker) |
-| **The method** | Molecular dynamics (MD) simulation with **GROMACS** — build the system, equilibrate it, simulate ≥100 ns, analyze the folding |
+| **The method** | Molecular dynamics (MD) simulation with **GROMACS** — build the system, equilibrate it, simulate (target ≥100 ns), analyze the folding |
 | **The hardware** | Workstation GPU for tests · **Taiwania 3** (NCHC supercomputer, Taiwan) for real runs |
 | **The guarantee** | Every parameter is verified and documented; automated checks (CI + `doctor`) catch mistakes before they waste compute |
 
@@ -20,7 +20,7 @@
 
 ## 📋 1. What is this project? (30 seconds)
 
-**NA53** is a 55-nucleotide single-stranded DNA aptamer
+**NA53** is a 75-nucleotide single-stranded DNA aptamer
 (`AGCAGCACAGAGGTCAGATGGCGCTGGATAGCAAGATCACGTTATCATCGTAAACCCTATGCGTGCTACCGTGAA`)
 that binds **NGAL** — a protein that appears in body fluids early during kidney
 injury. A sensor that catches NGAL with NA53 could detect kidney damage early.
@@ -57,9 +57,10 @@ sequence      →  3D .pdb     →  water box +     →  stable      →  long m
 | **05** | `05_visualization.py` | Publication-quality figures | `results/figures/*.png` |
 
 Each stage is a **file gate**: it refuses to run without its required input, and
-fails loudly instead of silently producing garbage. Rough time budgets for a
-75-nt system: predict ~1 h (mostly human) · prep ~5 min · equil ~2 h · prod
-**~40–70 ns/day** on Taiwania 3 CPU (100 ns fits the 4-day queue) · analysis ~1 h.
+fails loudly instead of silently producing garbage. Measured on Taiwania 3
+(`ct56`, 290 k-atom system): prep+equil ~3 h · prod **18.3 ns/day** (1.31 h/ns) ·
+analysis ~1 h. ⚠️ A genuine 100 ns needs **two** 4-day queue segments via the
+checkpoint restart path (≈ 72 + 28 ns) — it does **not** fit one `ct56` job.
 
 ---
 
@@ -76,9 +77,10 @@ bash scripts/install_dependencies.sh          # one-time: conda env + GROMACS
 ./run_simulation.sh status                    # one-screen health report
 ```
 
-> Needs a real 3D structure at `structures/NA53_initial.pdb` (see ⚠️ box in
-> §8). Until the genuine NA53 model exists, use a stand-in duplex (PDB `1BNA`)
-> — the machinery is proven end-to-end; only the structure is missing.
+> ✅ The genuine structure exists: `structures/NA53_initial.pdb` — AlphaFold 3
+> `model_0` of the real 75-nt NA53, staged + blessed by
+> `validate_na53_pdb.py --stage` (mmCIF → PDB, amber-ready 5′-terminus). The
+> first production run below used it.
 
 ### B. Real run on Taiwania 3 (HPC)
 
@@ -112,7 +114,7 @@ GROMACS_NA53/
 ├── scripts/                  00–05 pipeline + doctor/health/integrity tooling
 ├── slurm/                    Taiwania 3 job scripts (01_prep … 04_analysis.sbatch)
 ├── profiles/                 machine settings (local_gpu · taiwania3_cpu ✅ · gpu templates)
-├── structures/               ⭐ the 3D input .pdb goes here (the one missing ingredient)
+├── structures/               ⭐ the 3D input .pdb lives here (AF3 model_0, staged + blessed)
 ├── system/ · equilibration/ · production/ · analysis/ · results/figures/ · logs/
 │     └─ pipeline outputs (working files live in scripts/; logs/run_status.txt is the trail)
 ├── docs/                     01–06 management docs · INCIDENT_ANALYSIS · HPC_GPU_OPTIONS
@@ -120,6 +122,9 @@ GROMACS_NA53/
 ├── research/                 the literature wing: SOP, reports, reference ledger, s2_search
 └── templates/                reusable parameter templates
 ```
+
+> `structures/` now holds the **real staged AF3 model** (`NA53_initial.pdb`,
+> provenance in `structures/raw_af3/`) — not a stand-in.
 
 ---
 
@@ -178,7 +183,7 @@ Literature work follows the **Research SOP** in [`research/`](research/README.md
 | **MD partition** | `ct56` — 56 cores, ~754 GB RAM, 4-day limit |
 | Larger partitions | `ct224` `ct560` `ct2k` `ct8k` |
 | GROMACS | conda-forge **2024.4 CPU** from env `na53_aptamer` (no compile needed) |
-| GPU reality | `ngs*` = restricted genomics service; `gpu-amd` down; **no CUDA module** → CPU jobs on `ct56` (expected ~40–70 ns/day) |
+| GPU reality | `ngs*` = restricted genomics service; `gpu-amd` down; **no CUDA module** → CPU jobs on `ct56` (**measured 18.3 ns/day** on 56 cores; no 28→56-core scaling gain — memory-bandwidth limited) |
 | Storage | `/home` + `/work` (GPFS); check with `hfs-quota` |
 
 > **GPU path:** TWCC is offline; Taiwania 3 GPU partitions or TWAI (Taiwania 2)
@@ -187,7 +192,7 @@ Literature work follows the **Research SOP** in [`research/`](research/README.md
 
 ---
 
-## 🩺 8. Quality assurance + the one missing ingredient
+## 🩺 8. Quality assurance + run status
 
 | Guard | What it does | Run when |
 |---|---|---|
@@ -201,15 +206,56 @@ group indices, packaging) is classified with its prevention in
 **[`docs/INCIDENT_ANALYSIS.md`](docs/INCIDENT_ANALYSIS.md)** and
 [`docs/LESSONS_LEARNED_FROM_TRIAL_RUNS.md`](docs/LESSONS_LEARNED_FROM_TRIAL_RUNS.md).
 
-> ⚠️ **The one missing ingredient:** the genuine 3D model of NA53 at
-> `structures/NA53_initial.pdb`. Everything else is built, tested, and CI-protected.
-> Candidate model sources (researched, with caveats): **AlphaFold 3** (handles
-> G-quadruplex/pseudoknot topologies), w3DNA / 3dDNA (B-form builders), or an
-> experimental structure — see `docs/REFERENCES.md` and the research reports.
+> ✅ **Run status (2026-09-06):** the genuine NA53 structure is staged and a
+> **15 ns production pilot ran end-to-end on Taiwania 3** (job `2036720`,
+> 18.3 ns/day, full analysis). A raw-data audit corrected three record errors
+> before trusting the numbers — the run is **15 ns, not 100 ns**; energy terms
+> are now extracted **by name** (GROMACS term IDs shift between stages); and
+> true Rg is 3.55 nm. Full details: `research/reports/2026-09-06-na53-15ns-run-audit.md`
+> (audit) and `2026-09-06-na53-15ns-pilot-writeup.md` (write-up) — snapshot in §9.
 
 ---
 
-## 🔧 9. Troubleshooting (top rows)
+## 📈 9. Results — first production run (15 ns pilot, 2026-09-05 → 06)
+
+**System:** 75-nt NA53 (AF3 model_0) + Na⁺/Cl⁻ + water, **290,578 atoms**, amber99sb-ildn/TIP3P,
+310 K, 1 bar, GROMACS 2024.4 on Taiwania 3 `ct56` — job `na53_prod 2036720`
+(18.315 ns/day; prod.log + archive verified by the raw-data audit).
+
+| Quantity | mean ± sd | Interpretation (15 ns) |
+|---|---|---|
+| RMSD (nm) | 0.744 ± 0.174 · final 1.032 | **still rising — trajectory not converged** |
+| Rg (nm) | **3.548 ± 0.104** (3.27–3.86) | stable partially collapsed globule (fully extended ≈ 14 nm) |
+| SASA (nm²) | 148.5 ± 1.5 | stable solvent exposure — no unfolding events |
+| Intra-DNA H-bonds | 70.7 ± 3.7 (58–83) | persistent internal base-pairing network |
+| Temperature (K) | 310.14 ± 0.59 | thermostat healthy ✓ |
+| Density (kg/m³) | 988.6 ± 1.6 | correct (name-based extraction; audit §2.1) |
+| Pressure (bar) | 2.0 ± 50.7 | ≈ target; Parrinello–Rahman swings are normal |
+| Cluster occupancy | **347 clusters** @0.2 nm; top-1 = 0.7 % | **no dominant conformational family** |
+
+**Flexibility architecture (biosensor-relevant):** free, solvent-exposed **3′-tail (res 73–75,
+RMSF 0.96–1.43 nm)** — the natural end-tethering point; a flexible **loop (31–35)** and a
+**rigid core (22–26)**. These are candidate design features, not binding conclusions (NGAL was
+not simulated).
+
+![NA53 per-residue RMSF over 15 ns with sequence + region annotation](docs/figures/na53_15ns/fig_a_rmsf_sequence.png)
+
+![NA53 compaction and internal pairing: Rg and intra-DNA H-bond time series](docs/figures/na53_15ns/fig_b_rg_hbonds.png)
+
+![Dominant collective motion PC1 (35.1 %) with occupancy histogram](docs/figures/na53_15ns/fig_c_pc1_trajectory.png)
+
+![Cluster-size distribution and coverage — no dominant basin](docs/figures/na53_15ns/fig_d_clusters.png)
+
+**Honest status:** one non-converged 15 ns trajectory — provisional picture. The completed
+report (Word/PDF-ready markdown), the raw-data audit, and the road map (replicas → genuine
+100 ns via two RESTART segments → force-field check → explicit NGAL docking) are in
+[`research/reports/`](research/reports/): `2026-09-06-na53-15ns-pilot-writeup.md` (write-up) ·
+`2026-09-06-na53-15ns-run-audit.md` (corrections) · `2026-09-06-na53-100ns-results.md`
+(superseded, carries a correction banner).
+
+---
+
+## 🔧 10. Troubleshooting (top rows)
 
 | Problem | Solution |
 |---|---|
@@ -231,7 +277,7 @@ group indices, packaging) is classified with its prevention in
 
 ---
 
-## 📚 10. Key references
+## 📚 11. Key references
 
 > Full audited register (URLs, usage, verification status for **every** source):
 > **[`docs/REFERENCES.md`](docs/REFERENCES.md)** — read that one for citations.
@@ -252,6 +298,6 @@ aptamer-in-silico toolchain survey, and the 67-reference bibliography analysis
 
 ---
 
-*Generated 2026-09-03 · Rewritten beginner-first 2026-09-04 · Project:
-GROMACS_NA53 · Target: NGAL biosensing. All values verified — see `memory.md`
-and the ✅ comments in `configs/*.mdp`.*
+*Generated 2026-09-03 · Rewritten beginner-first 2026-09-04 · Results + 15 ns audit
+2026-09-06 · Project: GROMACS_NA53 · Target: NGAL biosensing. All values verified —
+see `memory.md` and the ✅ comments in `configs/*.mdp`.*

@@ -12,10 +12,20 @@
 #   ./run_simulation.sh doctor [--profile NAME]        # pre-run health check (static + live gmx probes)
 #   ./run_simulation.sh start  [--profile NAME] [--ns N] [--stage all|prep|equil|prod|analysis] [--pdb FILE]
 #   ./run_simulation.sh submit [--profile NAME] [--ns N] [--dry-run]
+#   ./run_simulation.sh archive [--run-id ID] [--yes]  # preserve finished run BEFORE the next one
+#   ./run_simulation.sh runs                             # run registry (RUN_ID, requested vs VERIFIED ns)
+#   ./run_simulation.sh extend [--profile NAME] [--to N] [--submit]  # continue finished run from checkpoint
 #   ./run_simulation.sh status [--profile NAME] [--local]   # snapshot incl. health report (H1-H4)
 #   ./run_simulation.sh monitor [--profile NAME] [--once]    # LIVE dashboard (job/stage/T-P/ns-day/ETA, polls every 30 s; --once = snapshot)
 #   (status & monitor run scripts/health_report.sh — doctor-style ✅/⚠️/❌ —
 #    locally AND over SSH, so cluster jobs report health the same way)
+#
+# RUN IDENTITY (post-15ns-pilot): every chain registers a RUN_ID in
+# logs/run_registry.tsv (scripts/run_state.sh). Requested ns is recorded
+# at submit; the VERIFIED ns is parsed from prod.log once production ends.
+# A new chain is REFUSED while un-archived run data sits in scripts/ — run
+# `./run_simulation.sh archive` to preserve it. This kills the flat-workspace
+# overwrite bug and the "100 ns report on a 15 ns run" naming bug.
 #
 # Profiles live in profiles/*.env — see profiles/README.md.
 # Postmortem + prevention map: docs/INCIDENT_ANALYSIS.md.
@@ -31,6 +41,11 @@ cd "$REPO_ROOT"
 STATUS_FILE="$REPO_ROOT/logs/run_status.txt"
 JOBS_DIR="$REPO_ROOT/slurm/jobs"
 PROFILE_NAMES=(taiwania3_cpu taiwania3_gpu taiwania2_twai_gpu local_gpu)
+
+# shellcheck source=scripts/run_state.sh
+# shellcheck disable=SC1091
+source "$REPO_ROOT/scripts/run_state.sh"   # registry + verified-ns helpers
+STAGES_SBATCH=(01_prep 02_equil 03_prod 04_analysis)
 
 # ─── Help ──────────────────────────────────────────────────
 usage() {
@@ -102,7 +117,20 @@ need_gmx() {
     echo "   gmx: $(gmx --version 2>&1 | head -1)"
 }
 
-STAGES_SBATCH=(01_prep 02_equil 03_prod 04_analysis)
+# ─── Run-registry plumbing (post-15ns-pilot) ───────────────
+# Active run id, set by cmd_start/cmd_submit. Persisted to a side file so
+# status/monitor/archive can find it without re-parsing.
+ACTIVE_RUN_FILE="$REPO_ROOT/logs/.active_run_id"
+active_run() { [ -f "$ACTIVE_RUN_FILE" ] && cat "$ACTIVE_RUN_FILE" || echo ""; }
+set_active_run() { mkdir -p "$REPO_ROOT/logs"; echo "$1" > "$ACTIVE_RUN_FILE"; }
+
+# unarchived run data present in the flat stage workspace? (exit 0 = yes)
+unarchived_prod_data() {
+    ls scripts/prod.xtc scripts/prod.edr scripts/prod.cpt 2>/dev/null | grep -q .
+}
+
+# registry has a row for RUN_ID already archived?
+row_archived() { run_state_is_archived "${1:-}" 2>/dev/null; }
 
 # ─── Subcommand: profile ───────────────────────────────────
 cmd_profile() {
@@ -158,8 +186,38 @@ cmd_start() {
         all|predict|prep)
             [ -f "$PDB" ] || { echo "❌ input PDB not found: $PDB (use --pdb FILE or place NA53_initial.pdb)"; exit 1; } ;;
     esac
-    echo "== start | profile=$PROFILE_NAME_CUR stage=$stage ns=${ns:-$PROD_NS} pdb=$(basename "$PDB") =="
-    log_status "start profile=$PROFILE_NAME_CUR stage=$stage ns=${ns:-$PROD_NS} pdb=$(basename "$PDB")"
+
+    # Fresh full runs must not clobber a preserved-but-unarchived previous run
+    # (INCIDENT 2026-09-06: the 15 ns run was almost lost to the flat workspace).
+    # Partial stage runs (prep/equil/prod/analysis alone) are RESUMES of the
+    # current run and are allowed — only a full fresh chain needs the guard.
+    if [ "$stage" = "all" ] && unarchived_prod_data; then
+        local cur; cur=$(active_run)
+        if [ -z "$cur" ] || ! row_archived "$cur"; then
+            echo "❌ scripts/ still holds un-archived run data (prod.*)."
+            echo "   A fresh run would silently overwrite it. Preserve it first:"
+            echo "     ./run_simulation.sh archive   # move prod.* + analysis into archive/<RUN_ID>"
+            echo "   or extend it instead of re-running:"
+            echo "     ./run_simulation.sh extend --profile $PROFILE_NAME_CUR --to N"
+            exit 1
+        fi
+    fi
+
+    # register this chain in the run registry (RUN_ID = YYYYMMDD-rN). Partial
+    # stage resumes (--stage prod etc.) REUSE the active run if one exists — a
+    # resume is not a new run and must not spawn registry rows.
+    local RUN_ID cur
+    RUN_ID=""
+    if [ "$stage" != "all" ]; then
+        cur=$(active_run)
+        [ -n "$cur" ] && ! row_archived "$cur" && RUN_ID="$cur"
+    fi
+    if [ -z "$RUN_ID" ]; then
+        RUN_ID=$(run_state_new "$PROFILE_NAME_CUR" "$([ "$stage" = all ] && echo fresh || echo partial)" "${ns:-$PROD_NS}")
+    fi
+    set_active_run "$RUN_ID"
+    echo "== run $RUN_ID | profile=$PROFILE_NAME_CUR stage=$stage ns=${ns:-$PROD_NS} pdb=$(basename "$PDB") =="
+    log_status "run=$RUN_ID start profile=$PROFILE_NAME_CUR stage=$stage ns=${ns:-$PROD_NS} pdb=$(basename "$PDB")"
 
     need_gmx
     mkdir -p structures system equilibration production analysis results/figures logs
@@ -221,6 +279,15 @@ cmd_start() {
         analysis) run_stage_analysis ;;
         *) echo "❌ unknown stage: $stage"; exit 2 ;;
     esac
+
+    # Full interactive chain finished → mark verified ns + finished in the registry
+    # (parsed from the real prod.log — never trust the requested value).
+    if [ "$stage" = "all" ] && [ -f scripts/prod.log ]; then
+        local vns rns; read -r vns rns <<< "$(ns_from_log "$REPO_ROOT/scripts/prod.log")"
+        run_state_update "$RUN_ID" STATE=finished NS_VER="$vns" NS_REACH="$rns" FINISHED="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+        echo "== run $RUN_ID finished — VERIFIED ${vns} ns reached ${rns} ns (prod.log) =="
+        echo "   Preserve it before the next run:  ./run_simulation.sh archive"
+    fi
     echo "== start finished — status: tail logs/run_status.txt =="
 }
 
@@ -228,8 +295,8 @@ cmd_start() {
 # Generates slurm/jobs/*_<profile>.sbatch from the verified templates, patching
 # partition/account/time/cpus/mem (+ optional gres) and swapping the environment
 # block for the profile's ENV_SETUP, then submits 01→02→03→04 with afterok deps.
-generate_jobs() { # $1 = profile name, $2 = production length in ns (default for the 03 job)
-    local prof="$1" ns_def="${2:-100}"
+generate_jobs() { # $1 = profile, $2 = ns, $3 = RUN_ID (optional; embedded as env for stage hooks)
+    local prof="$1" ns_def="${2:-100}" run_id="${3:-}"
     local jobs=()
     rm -rf "$JOBS_DIR"; mkdir -p "$JOBS_DIR"
     for base in "${STAGES_SBATCH[@]}"; do
@@ -241,8 +308,8 @@ generate_jobs() { # $1 = profile name, $2 = production length in ns (default for
             03_prod) T="$TIME_03"; C="$CPUS_03"; M="$MEM_03" ;;
             04_analysis) T="$TIME_04"; C="$CPUS_04"; M="$MEM_04" ;;
         esac
-        awk -v env="$ENV_SETUP" '
-            /^# >>> NA53_ENV_SETUP >>>/ { print; printf "%s\n", env; inblock=1; next }
+        awk -v env="$ENV_SETUP" -v rid="$run_id" '
+            /^# >>> NA53_ENV_SETUP >>>/ { print; if (rid != "") printf "export NA53_RUN_ID=%s\n", rid; printf "%s\n", env; inblock=1; next }
             /^# <<< NA53_ENV_SETUP <<</ { inblock=0; print; next }
             !inblock { print }
         ' "$src" \
@@ -253,9 +320,13 @@ generate_jobs() { # $1 = profile name, $2 = production length in ns (default for
             -e "s|^#SBATCH --cpus-per-task=.*|#SBATCH --cpus-per-task=${C}|" \
             -e "s|^#SBATCH --mem=.*|#SBATCH --mem=${M}|" \
         > "$out"
-        if [ "$base" = "03_prod" ] && [ "$ns_def" != "100" ]; then
-            # honor --ns: template's NS_LENGTH default is 100 — override in the generated job
-            sed -i "s|NS_LENGTH=\"\${1:-100}\"|NS_LENGTH=\"\${1:-$ns_def}\"|" "$out"
+        if [ "$base" = "03_prod" ]; then
+            # ALWAYS pin the requested ns into the generated 03 job, whatever the
+            # template default says. INCIDENT 2026-09-06: the override was guarded
+            # by `[ "$ns_def" != "100" ]`, so when a drifted template default (15)
+            # was present, requesting 100 skipped the sed and the run silently
+            # produced 15 ns while every report said 100 ns.
+            _pin_ns_length "$out" "$ns_def"
         fi
         if [ -n "${GRES:-}" ]; then
             # one --account= line exists in every template header — append gres after it
@@ -266,6 +337,39 @@ generate_jobs() { # $1 = profile name, $2 = production length in ns (default for
         jobs+=("$base:$out")
     done
     for j in "${jobs[@]}"; do echo "${j%%:*} → ${j#*:}"; done
+}
+
+# _pin_ns_length <sbatch-file> <ns_value> — rewrite NS_LENGTH=${1:-$ns} to use
+# the requested ns, verified twice (sed + grep). INCIDENT 2026-09-06 fix:
+# the old sed failed when called deep inside generate_jobs because the shell
+# positional escapes interact badly with "${1:-...}" inside double-quoted sed.
+_pin_ns_length() {
+    local out="$1" ns_def="$2"
+    # Rewrite the template's NS_LENGTH default to the requested ns, whatever
+    # number the template currently carries (INCIDENT 2026-09-06: drift from
+    # 100 to 15 sailed through when the pin was skipped).
+    #
+    # Template line:  NS_LENGTH="${1:-15}"
+    # Match the whole line and rewrite. Use awk with comma as FS (never in
+    # this line) to avoid all double-quote escaping: split on ",", reassemble.
+    awk -F'"' -v ns="$ns_def" '
+        /^NS_LENGTH=/ {
+            # $1 = NS_LENGTH=   $2 = ${1:-15}   $3 = (empty, trailing ")
+            # Rebuild with new default inside the quotes
+            print $1 "\"" "${1:-" ns "}" "\""
+            next
+        }
+        { print }
+    ' "$out" > "$out.tmp" && mv "$out.tmp" "$out"
+
+    # Verify the pin is present.
+    if ! grep -qF "NS_LENGTH=\"\${1:-${ns_def}}\"" "$out"; then
+        echo "❌ generate_jobs: NS_LENGTH pin failed in $out" >&2
+        echo "   wanted: NS_LENGTH=\"\${1:-${ns_def}}\"" >&2
+        echo "   current line:" >&2
+        grep -n 'NS_LENGTH' "$out" >&2 || true
+        return 1
+    fi
 }
 
 cmd_submit() {
@@ -287,9 +391,33 @@ cmd_submit() {
     fi
 
     local prof="$PROFILE_NAME_CUR"
+
+    # Guard: never let a fresh chain overwrite an un-archived finished run.
+    if unarchived_prod_data; then
+        local cur; cur=$(active_run)
+        if [ -z "$cur" ] || ! row_archived "$cur"; then
+            echo "❌ scripts/ still holds un-archived run data (prod.*)."
+            echo "   A fresh chain would silently overwrite the previous run."
+            echo "   Preserve it first:"
+            echo "     ./run_simulation.sh archive   # → archive/<RUN_ID>__<verified>ns/"
+            echo "   Or continue it instead:"
+            echo "     ./run_simulation.sh extend --profile $prof --to N [--submit]"
+            exit 1
+        fi
+    fi
+
     echo "== submit | profile=$prof partition=$PARTITION gres='${GRES:-none}' ns=${ns:-$PROD_NS} =="
+
+    # register this chain (fresh always gets a new RUN_ID) — BEFORE generating so
+    # the RUN_ID is embedded into the jobs for the end-of-chain registry hook
+    local RUN_ID=""
+    if [ "$dry" != "1" ]; then
+        RUN_ID=$(run_state_new "$prof" fresh "${ns:-$PROD_NS}")
+        set_active_run "$RUN_ID"
+        echo "✔ run $RUN_ID registered"
+    fi
     echo "Generating jobs from verified templates → $JOBS_DIR/"
-    generate_jobs "$prof" "${ns:-$PROD_NS}"
+    generate_jobs "$prof" "${ns:-$PROD_NS}" "$RUN_ID"
 
     if [ "$dry" = "1" ]; then
         echo ""
@@ -303,12 +431,12 @@ cmd_submit() {
         return
     fi
 
-    log_status "submit profile=$prof partition=$PARTITION gres='${GRES:-none}' ns=${ns:-$PROD_NS}"
+    log_status "submit run=$RUN_ID profile=$prof partition=$PARTITION gres='${GRES:-none}' ns=${ns:-$PROD_NS}"
     # Submit FROM slurm/ (so SLURM_SUBMIT_DIR=slurm): the sbatch templates resolve
     # `--output=../logs/` and `cd ${SLURM_SUBMIT_DIR}/../scripts` against the
     # submission cwd. INCIDENT 2026-09-04: submitting from the repo root sent job
     # logs to ~/logs/ (the repo's parent) and could cd jobs into ~/scripts.
-    local prev="" jid
+    local prev="" jid jobids=""
     (
         cd slurm
         for base in "${STAGES_SBATCH[@]}"; do
@@ -319,12 +447,15 @@ cmd_submit() {
                 jid=$(sbatch --parsable "$job")
             fi
             echo "✔ ${base}: job $jid"
-            log_status "job ${base} id=$jid"
+            log_status "job ${base} id=$jid run=$RUN_ID"
+            jobids="${jobids:+$jobids,}${base}=$jid"
             prev="$jid"
         done
+        # registry write must happen INSIDE this subshell: jobids accumulated here
+        run_state_update "$RUN_ID" STATE=submitted JOBS="$jobids"
     )
     echo ""
-    echo "Chain submitted. Watch:  ./run_simulation.sh monitor --profile $prof"
+    echo "Chain submitted (run $RUN_ID). Watch:  ./run_simulation.sh monitor --profile $prof"
 }
 
 # ─── Subcommand: status / monitor ──────────────────────────
@@ -428,6 +559,202 @@ cmd_monitor() {
     fi
 }
 
+# ─── Subcommand: runs (registry view) ─────────────────────
+cmd_runs() {
+    load_profile "${1:-}"
+    echo "── Run registry ($REPO_ROOT/logs/run_registry.tsv) ──"
+    run_state_show
+    echo ""
+    echo "Active run: $(active_run || echo '<none>')"
+    if unarchived_prod_data; then
+        echo "⚠️  Un-archived run data still in scripts/ — run:  ./run_simulation.sh archive"
+    fi
+}
+
+# ─── Subcommand: archive (preserve a finished run) ─────────
+# Moves run artifacts out of the flat scripts/ workspace into
+# archive/<RUN_ID>__<verified>ns/ so the NEXT run cannot overwrite them
+# (INCIDENT 2026-09-06: the 15 ns pilot was nearly lost this way).
+# Archive dir is named from the VERIFIED ns, never the requested one.
+cmd_archive() {
+    local run_id="" yes=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --run-id) run_id="$2"; shift 2 ;;
+            --yes|-y) yes=1; shift ;;
+            *) shift ;;
+        esac
+    done
+    [ -z "$run_id" ] && run_id=$(active_run)
+    if [ -z "$run_id" ]; then
+        echo "❌ no RUN_ID known. Use --run-id, or register one via start/submit first."
+        echo "   (registry: ./run_simulation.sh runs)"
+        exit 1
+    fi
+
+    # Only archive what actually exists — nothing to do is not an error, but
+    # an un-finished run (no Finished mdrun) is worth a loud warning.
+    if ! unarchived_prod_data; then
+        echo "⚠️  No un-archived prod.* artifacts in scripts/ — nothing to archive."
+        echo "   (run $run_id registry state: $(awk -F'\t' -v id="$run_id" '$1==id{print $8}' logs/run_registry.tsv 2>/dev/null || echo '?'))"
+        run_state_update "$run_id" STATE=archived 2>/dev/null || true
+        exit 0
+    fi
+
+    # verified length from the REAL prod.log (fall back to the requested ns
+    # only if no log exists yet, and say so)
+    local vns rns vtag
+    read -r vns rns <<< "$(ns_from_log "$REPO_ROOT/scripts/prod.log" 2>/dev/null || echo "0 0")"
+    if awk -v v="$vns" 'BEGIN{exit !(v>0)}'; then
+        vtag="${vns}ns"
+    else
+        vns=$(awk -F'\t' -v id="$run_id" '$1==id{print $4}' logs/run_registry.tsv 2>/dev/null || echo "?")
+        vtag="${vns}ns_UNVERIFIED"
+        echo "⚠️  No finished prod.log — archiving with REQUESTED length tag ${vtag}. Verify later!"
+    fi
+
+    local dest="$REPO_ROOT/archive/${run_id}__${vtag}"
+    if [ -d "$dest" ]; then
+        echo "❌ archive dir already exists: $dest"
+        echo "   Refusing to overwrite. Move/rename it first."
+        exit 1
+    fi
+    mkdir -p "$dest"
+
+    echo "── Archiving run $run_id (VERIFIED ${vns} ns, reached ${rns} ns) ──"
+    echo "  → $dest"
+
+    # move the stage workspace artifacts (mv = frees scratch for the next run)
+    # NB layout: stage scripts run from scripts/ but write their analysis xvg
+    # to the REPO-ROOT analysis/ (04 uses ANALYSIS_DIR="../analysis") and the
+    # figures to root results/ — both are gitignored, regeneratable outputs
+    # that must travel with the run into the archive.
+    local moved=0
+    for pat in 'em.*' 'nvt.*' 'npt1.*' 'npt2.*' 'prod.*' 'system_*.gro' '*_processed.gro' \
+               '*_boxed.gro' '*_solvated.gro' '*_ionized.gro' 'topol.top' 'posre_*.itp' \
+               'index.ndx' 'average.pdb' 'mdout.mdp' 'prod_mdp_temp.mdp'; do
+        for f in scripts/$pat; do
+            [ -f "$f" ] || continue
+            mv "$f" "$dest/" && moved=$((moved + 1))
+        done
+    done
+
+    # analysis/ + results/ (repo root — where 04/05 actually write)
+    for d in analysis results; do
+        if [ -d "$REPO_ROOT/$d" ] && [ -n "$(ls -A "$REPO_ROOT/$d" 2>/dev/null)" ]; then
+            mv "$REPO_ROOT/$d" "$dest/$d" 2>/dev/null || { cp -r "$REPO_ROOT/$d" "$dest/$d"; rm -rf "$REPO_ROOT/$d"; }
+        fi
+    done
+
+    # provenance manifest
+    local manifest="$dest/ARCHIVE_MANIFEST.txt"
+    {
+        echo "NA53 RUN ARCHIVE"
+        echo "==============="
+        echo "RUN_ID:        $run_id"
+        echo "ARCHIVED:      $(date '+%Y-%m-%d %H:%M:%S %Z')"
+        echo "VERIFIED ns:   $vns   (from prod.log nsteps ÷ steps/ns)"
+        echo "REACHED ns:    $rns   (last Step/Time row in prod.log)"
+        echo "REQUESTED ns:  $(awk -F'\t' -v id="$run_id" '$1==id{print $4}' logs/run_registry.tsv 2>/dev/null || echo '?')   (registry NS_REQ — may differ from VERIFIED!)"
+        echo "PROFILE:       $(awk -F'\t' -v id="$run_id" '$1==id{print $2}' logs/run_registry.tsv 2>/dev/null || echo '?') "
+        echo "JOBS:          $(awk -F'\t' -v id="$run_id" '$1==id{print $7}' logs/run_registry.tsv 2>/dev/null || echo '?') "
+        echo "FILES:         $moved moved from scripts/ + analysis/ + results/ trees"
+        echo ""
+        echo "RECIPE: rename this dir to anything readable; the __<verified>ns suffix"
+        echo "        is the ACTUAL length, which is what every report must cite."
+    } > "$manifest"
+
+    run_state_update "$run_id" STATE=archived ARCHIVE="${dest#$REPO_ROOT/}" FINISHED="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+    log_status "archive run=$run_id → ${dest#$REPO_ROOT/} verified=${vns}ns"
+    echo "✅ Archived. Registry updated. Next run can start safely."
+    echo "   Tip: figures/large analysis may also be committed to docs/figures/ per-report."
+}
+
+# ─── Subcommand: extend (continue a finished run from checkpoint) ──
+# Extends the CURRENT run's trajectory (e.g. 15 ns → 30 ns) by converting
+# the existing .tpr to a longer end-time and continuing mdrun from prod.cpt
+# (gmx convert-tpr -until N + mdrun -cpi). No re-equilibration — the new
+# segment appends to the same prod.xtc/.edr, so nothing from the previous
+# run is touched or lost.
+#   ./run_simulation.sh extend --profile P --to 30            # local foreground
+#   ./run_simulation.sh extend --profile P --to 30 --submit   # SLURM job
+cmd_extend() {
+    local flag_name="" to="" submit=0
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --profile) flag_name="$2"; shift 2 ;;
+            --to) to="$2"; shift 2 ;;
+            --submit) submit=1; shift ;;
+            *) shift ;;
+        esac
+    done
+    load_profile "$flag_name"
+    local run_id; run_id=$(active_run)
+    if [ -z "$run_id" ]; then
+        echo "❌ no active run. Register one first:"
+        echo "     ./run_simulation.sh start --profile $PROFILE_NAME_CUR --ns 15 --stage prod"
+        exit 1
+    fi
+    [ -f scripts/prod.tpr ] || { echo "❌ scripts/prod.tpr missing — nothing to extend"; exit 1; }
+    [ -f scripts/prod.cpt ] || { echo "❌ scripts/prod.cpt missing — need a checkpoint to continue from"; exit 1; }
+
+    # current VERIFIED length
+    local vns rns
+    read -r vns rns <<< "$(ns_from_log "$REPO_ROOT/scripts/prod.log" 2>/dev/null || echo "0 0")"
+    local target="${to:-0}"
+    if ! awk -v t="$target" -v v="$vns" 'BEGIN{exit !(t>v && t<=10000)}'; then
+        echo "❌ --to must exceed the current VERIFIED length ($vns ns) and be sane (≤10000 ns)."
+        exit 1
+    fi
+    local target_steps; target_steps=$((target * 500000))
+    local target_ps;  target_ps=$((target * 1000))
+
+    echo "== extend | run=$run_id profile=$PROFILE_NAME_CUR ${vns}ns → ${target}ns (checkpoint continuation) =="
+    echo "  current verified: ${vns} ns (prod.log) · reached ${rns} ns"
+    echo "  new end:         ${target_ps} ps = ${target_steps} steps"
+    echo "  mechanism: gmx convert-tpr -until $target_ps → mdrun -cpi prod.cpt (appends; no re-equilibration)"
+
+    if [ "$submit" = "1" ]; then
+        # No SLURM submit path for extend yet — 03 template runs prod fresh.
+        echo "❌ --submit not implemented for extend in this version."
+        echo "   Run it as an interactive foreground job instead (remove --submit)."
+        echo "   Alternatively, on the cluster: sbatch a short interactive node:"
+        echo "     srun -p ${PARTITION:-ct56} -A ${ACCOUNT:-<acct>} --cpus-per-task=${CPUS_03:-56} --time=95:00:00 --pty bash"
+        echo "     ./run_simulation.sh extend --profile $PROFILE_NAME_CUR --to $target"
+        exit 2
+    fi
+
+    need_gmx
+    mkdir -p "$REPO_ROOT/logs"
+    ( cd scripts && \
+        gmx convert-tpr -s prod.tpr -until "$target_ps" -o prod.tpr.new \
+            > "$REPO_ROOT/logs/convert_tpr_extend.log" 2>&1 ) \
+        || { echo "❌ convert-tpr failed — see $REPO_ROOT/logs/convert_tpr_extend.log"; exit 1; }
+    ( cd scripts && mv prod.tpr prod.tpr.pre_extend && mv prod.tpr.new prod.tpr )
+
+    log_status "extend run=$run_id ${vns}ns→${target}ns target_steps=$target_steps"
+    echo "  ✓ prod.tpr extended to ${target} ns (original saved as prod.tpr.pre_extend)"
+    echo "  ▶ Continuing mdrun from prod.cpt in the FOREGROUND — do not interrupt."
+
+    # Continue: -cpi reads prod.cpt, -s prod.tpr (now longer); mdrun appends.
+    # ntomp from the profile's CPU count, or leave auto if unset.
+    local ntomp="${CPUS_03:-4}"
+    ( cd scripts && gmx mdrun -s prod.tpr -deffnm prod -cpi prod.cpt \
+            -cpo prod -cpt 900 -ntomp "$ntomp" \
+            > "$REPO_ROOT/logs/mdrun_prod_extend.log" 2>&1 ) \
+        || { echo "❌ mdrun (extend) failed — see $REPO_ROOT/logs/mdrun_prod_extend.log"; echo "   Restore: mv scripts/prod.tpr.pre_extend scripts/prod.tpr"; exit 1; }
+
+    # re-run analysis so xvg figures cover the FULL extended trajectory
+    echo "  ✓ Production extended to ${target} ns. Re-running analysis on the full trajectory..."
+    ( cd scripts && bash 04_analysis.sh prod 0 && python3 05_visualization.py ../analysis ) \
+        || echo "  ⚠️  re-analysis had issues — check scripts/analysis logs"
+
+    read -r vns rns <<< "$(ns_from_log "$REPO_ROOT/scripts/prod.log" 2>/dev/null || echo "0 0")"
+    run_state_update "$run_id" NS_VER="$vns" NS_REACH="$rns" STATE=finished
+    echo "── extend done — run $run_id now VERIFIED ${vns} ns ──"
+    echo "   Preserve: ./run_simulation.sh archive"
+}
+
 # ─── Subcommand: doctor (pre-run health check) ─────────────
 # Guards the bug classes from docs/INCIDENT_ANALYSIS.md:
 #  - static repo integrity (C1..C5) via scripts/check_repo_integrity.sh
@@ -478,6 +805,9 @@ case "$cmd" in
     doctor)   shift; cmd_doctor "$@" ;;
     start)    shift; cmd_start "$@" ;;
     submit)   shift; cmd_submit "$@" ;;
+    archive)  shift; cmd_archive "$@" ;;
+    runs)     shift; cmd_runs "$@" ;;
+    extend)   shift; cmd_extend "$@" ;;
     status)   shift; cmd_status "$@" ;;
     monitor)  shift; cmd_monitor "$@" ;;
     -h|--help|help|usage) usage ;;

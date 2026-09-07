@@ -79,3 +79,4 @@ prod_mdp_temp.mdp
 /Raw_Result_15ns/
 # gmx auto-backup files (#name.1#) — raw run debris, not source
 *#
+archive/

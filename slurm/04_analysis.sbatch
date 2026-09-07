@@ -50,6 +50,18 @@ bash 04_analysis.sh prod 0
 # Generate plots
 python3 05_visualization.py ../analysis
 
+# ── End-of-chain registry hook (only when launched via ./run_simulation.sh
+# submit, which embeds NA53_RUN_ID). Parses the VERIFIED length from the real
+# prod.log — never trusts the requested value (INCIDENT 2026-09-06). ──
+if [ -n "${NA53_RUN_ID:-}" ]; then
+    vns=$(bash run_state.sh ns_from_log prod.log | awk '{print $1}')
+    rns=$(bash run_state.sh ns_from_log prod.log | awk '{print $2}')
+    bash run_state.sh update "$NA53_RUN_ID" STATE=finished NS_VER="$vns" NS_REACH="$rns" \
+        FINISHED="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+    echo "run $NA53_RUN_ID finished — VERIFIED ${vns} ns reached ${rns} ns (prod.log)"
+    echo "  preserve before next run:  ./run_simulation.sh archive"
+fi
+
 echo ""
 echo "End: $(date)"
 echo "Analysis complete — check ../results/figures/ and ../analysis/"

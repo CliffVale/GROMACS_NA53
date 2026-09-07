@@ -423,6 +423,28 @@ render() {
     fi
 
     echo ""
+    echo "  ${C_B}VERIFIED LENGTH${C_0}  (from prod.log — never the requested value)"
+    if [ -f scripts/prod.log ]; then
+        local vns rns
+        read -r vns rns <<< "$(bash scripts/run_state.sh ns_from_log scripts/prod.log 2>/dev/null || echo '0 0')"
+        if awk -v v="$vns" 'BEGIN{exit !(v > 0)}' 2>/dev/null; then
+            echo "    tpr nsteps → ${C_B}${vns} ns${C_0}  (what .tpr was built for)"
+            echo "    actually reached → ${C_B}${rns} ns${C_0}  (last Step/Time row)"
+            if [ -f logs/run_registry.tsv ] && [ -f logs/.active_run_id ]; then
+                local req
+                req=$(awk -F'\t' -v id="$(cat logs/.active_run_id)" '$1==id{print $4}' logs/run_registry.tsv 2>/dev/null || echo '')
+                if [ -n "$req" ] && [ "$req" != "$vns" ] && [ "$req" != "$vns.0" ]; then
+                    echo "    ${C_Y}⚠️  requested ${req} ns but verified ${vns} ns — the ${C_B}${vns} ns${C_Y} is the truth${C_0}"
+                fi
+            fi
+        else
+            echo "    ${C_D}(no finished prod.log yet — length unverified)${C_0}"
+        fi
+    else
+        echo "    ${C_D}(no prod.log — production not started)${C_0}"
+    fi
+
+    echo ""
     echo "  ${C_B}PHYSICS${C_0}"
     if [ -n "$stage" ] && [ "$stage" != "em" ] && [ -n "$temp" ] && [ -n "$pres" ]; then
         echo "    T = ${C_B}${temp}${C_0} K (instantaneous · current temp snapshot)"

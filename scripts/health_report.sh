@@ -138,6 +138,33 @@ echo "  mdrun log: ${mlog:-none}${finished:+  ✅ finished}"
 [ -z "$mlog" ] && [ -z "$dlog" ] && echo "  (no md logs yet — nothing running)"
 
 echo ""
+
+# ── H5: verified run length (post-15ns-pilot) ──────────────
+# After the 2026-09-06 incident (100 ns requested → 15 ns run), the
+# health report shows the VERIFIED length from prod.log, never the
+# requested value. If they differ, the report warns explicitly.
+if [ -n "$dlog" ] && [ -f scripts/prod.log ]; then
+    read -r vns rns <<< "$(bash scripts/run_state.sh ns_from_log scripts/prod.log 2>/dev/null || echo "0 0")"
+    if awk -v v="$vns" 'BEGIN{exit !(v > 0)}' 2>/dev/null; then
+        echo "── H5  verified run length (from prod.log, never trusted request) ──"
+        echo "  VERIFIED ns:  ${vns} ns   (nsteps in .tpr ÷ 500k steps/ns)"
+        echo "  REACHED ns:  ${rns} ns   (last Step/Time row in prod.log)"
+        # Registry request — if different from verified, flag it
+        if [ -f logs/run_registry.tsv ] && [ -n "${vns}" ]; then
+            req=$(awk -F'\t' -v id="$(cat logs/.active_run_id 2>/dev/null || echo '')" '$1==id{print $4}' logs/run_registry.tsv 2>/dev/null || echo "")
+            if [ -n "$req" ] && [ "$req" != "$vns" ] && [ "$req" != "$vns.0" ]; then
+                echo "  ⚠️  REQUESTED was ${req} ns but run verified ${vns} ns — reporting VERIFIED only"
+                echo "     (INCIDENT 2026-09-06: a mismatch between requested and actual length"
+                echo "      caused a 100 ns report on a 15 ns run. Always cite VERIFIED ns.)"
+            fi
+        fi
+    fi
+elif [ -n "$dlog" ]; then
+    echo "── H5  verified run length ──"
+    echo "  (no finished prod.log yet — length unverified)"
+fi
+
+echo ""
 if [ "${integrity_rc:-0}" -ne 0 ] || [ "${probes_rc:-0}" -ne 0 ]; then
     echo "HEALTH RESULT: FAIL — fix the ❌ above before starting stages (docs/INCIDENT_ANALYSIS.md)"
     exit 1

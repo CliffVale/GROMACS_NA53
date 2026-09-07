@@ -41,6 +41,11 @@ echo "Node:   $SLURM_NODELIST"
 echo "Start:  $(date)"
 gmx --version 2>&1 | head -1
 
+# Mark the run as actually running (launcher-embedded RUN_ID; direct sbatch → no-op)
+if [ -n "${NA53_RUN_ID:-}" ]; then
+    bash run_state.sh update "$NA53_RUN_ID" STATE=running
+fi
+
 # Step 0: Predict structure (if PDB doesn't exist)
 if [ ! -f "../structures/NA53_initial.pdb" ]; then
     echo "▶ Predicting 3D structure..."

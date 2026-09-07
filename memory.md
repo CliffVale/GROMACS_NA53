@@ -3,8 +3,8 @@
 | Field | Value |
 |---|---|
 | **Status** | Active |
-| **Last updated** | 2026-09-04 |
-| **Current phase** | Phase 6 (T3 cluster run) IN PROGRESS — env CREATED + doctor PASSED on T3. **Prep failure 2031187 ROOT CAUSE CONFIRMED + fixed (2026-09-04-6)**: the AF3-staged PDB carried a 5'-phosphate (P/OP1/OP2) and OP1/OP2 spelling, but GROMACS amber99sb-ildn `DA5` is a **5'-OH terminus (no phosphate)** with phosphate oxygens named **O1P/O2P** → pdb2gmx died (0-byte topol.top). `validate_na53_pdb.py --stage` now drops the whole 5'-phosphate + renames to O1P/O2P; launcher now submits from `slurm/` (SLURM_SUBMIT_DIR fix, logs → repo `logs/`). PDB re-staged (1541 atoms, BLESSED). **Resume = pull → doctor → 1 ns smoke** |
+| **Last updated** | 2026-09-07 |
+| **Current phase** | Phase 6 COMPLETE — 15 ns pilot done, audit done, pipeline refactor done. **The pipeline is now correct for sequential runs**: run registry (RUN_ID + requested-vs-verified ns + archive state), NS_LENGTH pin fix (_pin_ns_length — the 100-vs-15 bug cannot recur), archive/extend/runs commands, verified-length display in health_report H5 + dashboard, new-run guard. Next: decide on the next run (GPU? 100 ns CPU via 2 RESTART segments? extend 15→30 ns? replicas?) and submit. |
 
 > **Purpose:** the single source of truth for *what has been done, what is being
 > worked on, and what comes next*. Any AI resuming this project must read this
@@ -224,6 +224,112 @@ LESSONS_LEARNED values (0.8 nm cutoff, V-rescale, PR barostat, etc.).
 
 ---
 
+## 9. Post-Pilot Pipeline Refactor (2026-09-07) — COMPLETE
+
+After the 15 ns pilot audit (entry 16) and the user's request to make the
+pipeline capable of sequential runs without data loss, a full refactor was
+completed. All changes are in this session's commits.
+
+### 9.1 What was built
+
+| Component | File | Purpose |
+|---|---|---|
+| Run registry | `scripts/run_state.sh` (NEW) | Every run gets a RUN_ID row; records requested ns at submit, VERIFIED ns from prod.log at finish, archive state, SLURM job IDs. `ns_from_log()` parses nsteps from prod.log → the truth about run length. |
+| NS_LENGTH pin fix | `run_simulation.sh _pin_ns_length()` | Unconditionally rewrites the 03 template's NS_LENGTH default to the requested value, verified by grep. Fixes the 2026-09-06 bug where requesting 100 ns silently produced 15 ns. Uses awk (not sed) to avoid quoting hell. |
+| New-run guard | `cmd_start`/`cmd_submit` | Refuses fresh chains while un-archived prod.* data exists in scripts/. Forces explicit archive or extend before overwriting. |
+| Archive command | `cmd_archive` | Moves finished run artifacts into `archive/<RUN_ID>__<verified>ns/` (named from VERIFIED ns, never requested). Preserves scripts/* + analysis/ + results/ + manifest. |
+| Runs command | `cmd_runs` | Shows the run registry — always know what runs happened and what they actually produced. |
+| Extend command | `cmd_extend --to N` | Continues a finished run from checkpoint: `gmx convert-tpr -until N + mdrun -cpi prod.cpt`. Extends 15→30 ns without re-equilibration. No data loss. |
+| Verified-length display | `health_report.sh H5` + `live_dashboard.sh VERIFIED LENGTH` | Shows the ACTUAL ns from prod.log, flags mismatches with requested ns. The 100-vs-15 naming bug cannot recur — the truth is always visible. |
+
+### 9.2 Critical bug fix: _pin_ns_length
+
+**Problem:** The 15 ns mystery — `./run_simulation.sh submit --ns 100` produced
+a 15 ns run because the 03 template's `NS_LENGTH="${1:-15}"` default (drifted
+from 100) was never overridden. The old sed-based override was guarded by
+`[ "$ns_def" != "100" ]`, so when ns=100 it skipped the pin entirely.
+
+**Fix:** `_pin_ns_length()` uses awk to split the NS_LENGTH line on `"` and
+rewrite the `${1:-N}` default to the requested value. Tested against:
+- Drifted template 15 → pinned 100 ✅
+- Template 99 → pinned 50 ✅
+- Template 100 → pinned 100 (no-op) ✅
+- Full generate_jobs integration (75 ns, 30 ns, 15 ns requests) ✅
+
+**Verification:** Always `grep NS_LENGTH slurm/jobs/03_prod_*.sbatch` after
+submit to confirm the pin landed. The dashboard H5 section will show the
+verified length once mdrun finishes.
+
+### 9.3 Monitoring upgrades
+
+- `health_report.sh` H5 section: shows VERIFIED ns from prod.log (nsteps ÷
+  500k steps/ns), REACHED ns (last Step/Time row), and flags if REQUESTED ≠
+  VERIFIED (the 100-vs-15 mismatch would now be flagged, not silently reported).
+- `live_dashboard.sh` VERIFIED LENGTH section: same info in the live dashboard,
+  so the operator always sees the truth during a run.
+
+### 9.4 Pipeline audit (docs/INCIDENT_ANALYSIS.md §6-8)
+
+Documented 6 new defects exposed by the 15 ns run:
+1. Flat workspace (run N+1 overwrites run N) → archive + guard
+2. No run identity (100 ns report on 15 ns run) → registry
+3. NS generation bug (conditional override skipped) → _pin_ns_length
+4. No verified-length check (post-hoc audit needed) → ns_from_log + H5
+5. Silent chain death (prep died, only empty squeue hinted) → dashboard stale check
+6. Analysis/ + results/ written to repo root, not scripts/ → archive fixed
+
+Also documented 5 known gaps still remaining (GPU not working, extend has no
+SLURM submit, no automated replicas, no AF3→TPR provenance chain, no CI mdrun
+test).
+
+### 9.5 New deliverable: 15ns_report.md
+
+`research/reports/2026-09-06-na53-15ns-report.md` — comprehensive scientific
+report: aim, workflow flowchart (ASCII), full methodology with rationale for
+every decision (force field, water model, box, ion, EM, NVT, NPT, production),
+tools used table, corrected results (RMSD, Rg=3.548 nm, H-bonds, RMSF regions,
+PCA, clusters=347, SASA), inferences (structural + biosensing + methodological),
+probable improvements (immediate/medium/long-term), scope & conclusion, and
+correction appendices (length discrepancy, Rg discrepancy, energy-term bug).
+
+### 9.6 Validation
+
+Full pre-commit validation suite passed:
+- ✅ All 21 bash files pass `bash -n`
+- ✅ All executables are 100755 in index
+- ✅ No CHANGE_ME placeholders
+- ✅ MDP consistency (0.8 nm + shift-Verlet across all 5 configs)
+- ✅ _pin_ns_length verified end-to-end (drifted template → correct pin)
+- ✅ health_report H5 + dashboard VERIFIED LENGTH sections present
+- ✅ 15ns_report.md all sections present
+- ✅ INCIDENT_ANALYSIS.md audit + capabilities + gaps sections present
+- ✅ archive/ gitignored (prevents GB-scale artifacts in repo)
+
+### 9.7 Resume point
+
+The pipeline is now **correct** for sequential runs: every run gets a RUN_ID,
+artifacts are archived before the next run starts, the requested ns is pinned
+into the job and verified from prod.log, and the dashboard always shows the
+truth. Next: decide on the next run (GPU request? 100 ns CPU via 2 RESTART
+segments? extend 15→30 ns as a test? replicas?) and submit.
+
+### 9.8 Files changed this session
+
+| File | Change |
+|---|---|
+| `run_simulation.sh` | _pin_ns_length() + cmd_archive/cmd_runs/cmd_extend + new-run guards + generate_jobs NS pinning |
+| `scripts/run_state.sh` | NEW — run registry, ns_from_log, archive state |
+| `scripts/health_report.sh` | H5 verified-length section |
+| `scripts/live_dashboard.sh` | VERIFIED LENGTH section |
+| `slurm/01_prep.sbatch` | NA53_RUN_ID export + STATE=running marker |
+| `slurm/04_analysis.sbatch` | End-of-chain registry hook (finished + verified ns) |
+| `.gitignore` | Added `archive/` |
+| `docs/INCIDENT_ANALYSIS.md` | §6 pipeline audit, §7 new capabilities, §8 known gaps |
+| `research/reports/2026-09-06-na53-15ns-report.md` | NEW — comprehensive 15 ns pilot report |
+| `memory.md` | This entry + TL;DR update |
+
+---
+
 ## 7. Open Questions / Risks
 
 | # | Question | Owner | Blocking? |
@@ -255,3 +361,4 @@ When a session ends (human or AI):
 | 2026-09-06 (18) | **Deliverables session** — (a) 4 biosensor-focused figures from corrected xvg (`docs/figures/na53_15ns/` committed: RMSF+sequence-annotation, Rg/H-bond time series, PC1 trajectory+histogram, cluster size/coverage; generator script at `NA53_15ns_results/biosensor_figures/make_figures.py`); (b) thesis-ready Word+PDF export of the write-up (pandoc → docx → LibreOffice pdf, 9 pp letter, images embedded) at `NA53_15ns_results/deliverables/NA53_15ns_pilot_report.{md,docx,pdf}`; (c) README updated: 75-nt label, measured 18.3 ns/day, real structure present, new §9 Results w/ corrected table + figures, §8 run status, renumbered §10-11. | docs/figures/na53_15ns/, README.md |
 | 2026-09-06 (17) | **User decision: accept the 15 ns pilot; move to write-up** — production sampling paused after the audit; full honest results write-up delivered at `research/reports/2026-09-06-na53-15ns-pilot-writeup.md` (system/methods, corrected results, convergence caveats, biosensor interpretation: free 3' tail = tether point, 31-35 loop + core = candidate NGAL-contact regions, NOT binding conclusions; path to publication = replicas/100 ns/enhanced sampling/GPU). Deep-analysis script + output preserved at `/run/media/cliff/WD_HDD/GROMACS/NA53_15ns_results/`. | research/reports/2026-09-06-na53-15ns-pilot-writeup.md |
 | 2026-09-06 (16) | **Run audit: the completed run is 15 ns, not 100 ns + energy-term/Rg/cluster corrections + scripts fixed** — archive downloaded from T3 via SSH bridge to `/run/media/cliff/WD_HDD/GROMACS/NA53_15ns_results/15ns_prod/` (xtc 1.62 GB byte-verified + 22 xvg + 8 png + edr/cpt/log). Raw verification: prod.log `.tpr` = **7,500,000 steps = 15,000 ps = 15 ns** (generated 03 job had `NS_LENGTH="${1:-15}"`; claimed `--ns 100` never reached the run; current repo defaults to 100 — always `grep NS_LENGTH slurm/jobs/` after submit). **Energy-term bug class found a 3rd time**: gmx IDs are per-.edr — prod term 36 = Pres-XY (not Density=23), nvt.edr has Position-Rest. shift (Temperature=16 not 15 — old code wrote Conserved-En into nvt_temperature.xvg), em 10 = Coul.-recip (not Potential=11), npt2 files swapped (24=pV, 23=Density). Corrected re-extraction (Density 988.6 kg/m³, NVT 310.2 K, EM final −4.86e6, NPT2 988.7/2.7 bar) written to archive both sides; **root fix: `scripts/gmx_energy_lib.sh` name-based term lookup + `02_equilibration.sh`/`04_analysis.sh` use it (7841d56, 8932876 — verified live on T3)**. Rg report column error: true total Rg (s0) = **3.548 ± 0.104 nm** (report's 2.94 matched no column). Cluster §6 'single dominant family' retracted: **347 clusters @0.2 nm, top-1 = 0.7%, top-10 = 7.1%** — no dominant basin. Conserved-En +205 MJ drift is v-rescale artifact (T/Potential/Density stable). RMSD still rising at 15 ns (2nd-half 0.789 > 1st-half 0.698 nm; last-4-ns slope +0.014 nm/ns). 100 ns @ 18.3 ns/day = 131 h → needs TWO 95-h ct56 jobs via RESTART (~6 d wall). Report 2026-09-06-na53-15ns-results-superseded.md carries a correction banner. | research/reports/2026-09-06-na53-15ns-run-audit.md, scripts/gmx_energy_lib.sh, NA53_15ns_results/ (local mirror), archive on T3 |
+| 2026-09-07 (20) | **Post-pilot pipeline refactor COMPLETE** — run registry (`scripts/run_state.sh`), NS_LENGTH pin fix (`_pin_ns_length()` in run_simulation.sh, uses awk not sed to avoid quoting hell; tested: drifted 15→100 ✅, 99→50 ✅, full generate_jobs integration for 75/30/15 ns ✅), new-run guard (refuses fresh chain while un-archived prod.* exists), `cmd_archive` (preserves into `archive/<RUN_ID>__<verified>ns/`), `cmd_runs` (registry view), `cmd_extend --to N` (convert-tpr -until + mdrun -cpi checkpoint continuation), monitoring upgrades (health_report H5 + dashboard VERIFIED LENGTH showing actual vs requested ns), comprehensive `15ns_report.md` (aim/workflow/methodology/tools/results/inferences/improvements/scope + correction appendices), pipeline audit (INCIDENT_ANALYSIS §6-8: 6 new defects + 5 known gaps). All validated: 21/21 bash -n pass, all 755 in index, no CHANGE_ME, MDP consistency, _pin_ns_length end-to-end verified. **The 100-vs-15 naming bug cannot recur** — NS is pinned unconditionally and verified from prod.log. | run_simulation.sh, scripts/run_state.sh, scripts/health_report.sh, scripts/live_dashboard.sh, slurm/01_prep.sbatch, slurm/04_analysis.sbatch, .gitignore, docs/INCIDENT_ANALYSIS.md, research/reports/2026-09-06-na53-15ns-report.md, memory.md |

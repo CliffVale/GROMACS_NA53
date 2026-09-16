@@ -42,7 +42,7 @@ Implementation of this analysis produced **`scripts/validate_na53_pdb.py --stage
 ---
 
 **Analysis Date:** 2026-09-02
-**Analyst:** Buffy (Codebuff AI)
+**Analyst:** Freebuff AI
 **Repositories Analyzed:**
 - https://github.com/dimassuarez/APTAMD (main suite)
 - https://github.com/dimassuarez/APTAMD_TUTORIALS (6-session course)

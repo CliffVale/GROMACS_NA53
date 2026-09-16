@@ -5,7 +5,7 @@
 | **Project name** | GROMACS_NA53 |
 | **Status** | Active — Phase 3 (Scaffolding) complete, ready for execution |
 | **Owner** | Cliff (IITD Masters student) |
-| **AI assistant** | Buffy (Codebuff/Freebuff) |
+| **AI assistant** | Freebuff |
 | **Last updated** | 2026-09-03 |
 
 ---
